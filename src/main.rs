@@ -1,5 +1,8 @@
 use std::{
-    cmp::min, fs::File, io::{BufReader, Read}, path::Path
+    cmp::min,
+    fs::File,
+    io::{BufReader, Read},
+    path::Path,
 };
 
 use hashbrown::HashSet;
@@ -11,6 +14,8 @@ const STRING_CHARS: &str =
     " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890-+_.$<>?=.,";
 const MIN_STRING_LENGTH: usize = 5;
 const MAX_STRING_LENGTH: usize = 150;
+
+const HEADER_FRONT_SIZE: usize = 1024;
 
 fn main() {
     let file_dir = "D:\\GitHub\\IdentifyTheFile\\samples";
@@ -38,7 +43,7 @@ fn main() {
         }
 
         // If we made it here then we have a valid file.
-        let chunk = read_header_chunk(entry.path());
+        let chunk = read_file_header_chunk(entry.path());
         let strings_hashset = generate_file_hashset(&chunk, &ref_chars);
 
         if is_first {
@@ -62,7 +67,7 @@ fn main() {
     println!("{reference_hashset:?}");
 }
 
-fn read_header_chunk(file_path: &Path) -> Vec<u8> {
+fn read_file_header_chunk(file_path: &Path) -> Vec<u8> {
     let file = File::open(file_path).expect("");
     let filesize = file.metadata().unwrap().len() as usize;
     let read_size = min(filesize, FILE_CHUNK_SIZE);
