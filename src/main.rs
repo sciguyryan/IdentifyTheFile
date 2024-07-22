@@ -1,7 +1,5 @@
 use std::{
-    fs::File,
-    io::{BufReader, Read},
-    path::Path,
+    cmp::min, fs::File, io::{BufReader, Read}, path::Path
 };
 
 use hashbrown::HashSet;
@@ -50,6 +48,8 @@ fn main() {
         }
 
         // We need to check for matching entries.
+        // TODO - a more thorough form of this would be to check if an entry is a substring
+        // TODO - of the other, trimming the string to a shorter length.
         reference_hashset.retain(|s| strings_hashset.contains(s));
 
         if reference_hashset.is_empty() {
@@ -64,10 +64,11 @@ fn main() {
 
 fn read_header_chunk(file_path: &Path) -> Vec<u8> {
     let file = File::open(file_path).expect("");
+    let filesize = file.metadata().unwrap().len() as usize;
+    let read_size = min(filesize, FILE_CHUNK_SIZE);
     let mut buf_reader = BufReader::new(file);
-    let mut buffer = vec![0; FILE_CHUNK_SIZE];
-    let bytes_read = buf_reader.read(&mut buffer).expect("");
-    buffer.truncate(bytes_read);
+    let mut buffer = vec![0; read_size];
+    buf_reader.read_exact(&mut buffer).expect("");
 
     buffer
 }
