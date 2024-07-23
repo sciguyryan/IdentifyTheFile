@@ -10,8 +10,8 @@ use walkdir::WalkDir;
 
 const FILE_CHUNK_SIZE: usize = 10 * 1024 * 1024; // 10 MB
 
-const STRING_CHARS: &str =
-    " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890-+_.$<>?=.,/";
+const STRING_CHARS: [u8; 75] =
+    *b" .,/abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890-+_.$<>?=";
 const MIN_STRING_LENGTH: usize = 5;
 const MAX_STRING_LENGTH: usize = 64;
 
@@ -21,9 +21,8 @@ fn main() {
     let file_dir = "D:\\GitHub\\IdentifyTheFile\\samples";
     let target_extension = "config";
 
-    let ref_chars: HashSet<u8> = STRING_CHARS.chars().map(|c| c as u8).collect();
+    let ref_chars: HashSet<u8> = STRING_CHARS.iter().copied().collect();
 
-    let mut is_first = true;
     let mut hashsets: Vec<HashSet<String>> = Vec::new();
 
     for entry in WalkDir::new(file_dir) {
@@ -96,26 +95,28 @@ fn read_file_header_chunk(file_path: &Path) -> Vec<u8> {
 fn generate_file_hashset(bytes: &[u8], reference: &HashSet<u8>) -> HashSet<String> {
     let mut string_map = HashSet::new();
 
+    let mut push_next = false;
     let mut string_buffer = String::with_capacity(MAX_STRING_LENGTH);
     for byte in bytes {
-        if !reference.contains(byte) {
-            // Start a new string sequence.
+        if push_next {
             if string_buffer.len() >= MIN_STRING_LENGTH {
                 string_map.insert(string_buffer.to_uppercase());
-                string_buffer = String::with_capacity(MAX_STRING_LENGTH);
             }
 
-            // Skip the non-string character.
+            string_buffer = String::with_capacity(MAX_STRING_LENGTH);
+            push_next = false;
+        }
+
+        if !reference.contains(byte) {
+            push_next = true;
             continue;
         }
 
-        // Push the string character into the buffer.
+        // Push the character onto the buffer.
         string_buffer.push(*byte as char);
 
-        // Is the string large enough that we must force a termination?
         if string_buffer.len() == MAX_STRING_LENGTH {
-            string_map.insert(string_buffer.to_uppercase());
-            string_buffer = String::with_capacity(MAX_STRING_LENGTH);
+            push_next = true;
         }
     }
 
