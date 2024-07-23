@@ -5,7 +5,7 @@ use std::{
     path::Path,
 };
 
-use hashbrown::HashSet;
+use hashbrown::{HashMap, HashSet};
 use walkdir::WalkDir;
 
 const FILE_CHUNK_SIZE: usize = 10 * 1024 * 1024; // 10 MB
@@ -44,41 +44,114 @@ fn main() {
         // If we made it here then we have a valid file.
         let chunk = read_file_header_chunk(entry.path());
         let new_hashset = generate_file_hashset(&chunk, &ref_chars);
+
         hashsets.push(new_hashset);
+
+        println!("-------------------------------------------------------");
+        println!("{hashsets:?}");
     }
+
+    println!("-------------------------------------------------------");
 
     if hashsets.is_empty() {
         println!("No strings were found!");
         return;
     }
 
-    let reference_hashset = hashsets.remove(0);
-    let mut common_elements = HashSet::new();
+    // TODO - remove the smallest set, less searching.
+    let mut reference_hashset = hashsets.remove(0);
 
-    // TODO - would this be more efficient using a trie data structure instead?
+    // Find the intersection of all sets.
+    for set in &hashsets {
+        let mut temp_set = reference_hashset.clone();
 
-    // Iterate through the remaining sets
-    for set in hashsets {
-        for string in &set {
-            if reference_hashset.contains(string) {
-                // If the string is an exact match for one in the reference set.
-                common_elements.insert(string.clone());
-            } else {
-                // Check if the string is a substring of any string in the reference set.
-                for master_string in &reference_hashset {
-                    if master_string.contains(string) {
-                        common_elements.insert(string.clone());
-                        break;
+        for ref_string in &reference_hashset {
+            //println!("ref_string = {ref_string}");
+
+            if set.contains(ref_string) {
+                //println!("exact match; skipping");
+                // Nothing to do here, the reference set already contains the item.
+                continue;
+            }
+
+            let mut matches = HashSet::new();
+            for string in set {
+                // Are we able to match a substring between the reference and new string?
+                if let Some(s) = largest_common_substring(string, ref_string) {
+                    // Don't add strings that are smaller than our minimum to reduce overhead.
+                    if s.len() > MIN_STRING_LENGTH {
+                        matches.insert(s);
                     }
                 }
+            }
+
+            // Select the largest substring match.
+            let largest_match = matches.iter().max_by_key(|s| s.len());
+            if let Some(m) = largest_match {
+                temp_set.remove(ref_string);
+                temp_set.insert(m.clone());
+            }
+        }
+
+        reference_hashset = temp_set;
+    }
+
+    println!("-------------------------------------------------------");
+    println!("reference_hashset = {reference_hashset:?}");
+
+    for entry in WalkDir::new(file_dir) {
+        let entry = entry.unwrap();
+        if !entry.file_type().is_file() {
+            continue;
+        }
+
+        let chunk = read_file_header_chunk(entry.path());
+        let strings = generate_file_hashset(&chunk, &ref_chars);
+
+        let mut matches = 0;
+        for el in &reference_hashset {
+            for str in &strings {
+                if str.contains(el) {
+                    matches += 1;
+                }
+            }
+        }
+
+        println!("--------------------------------------");
+        println!("{}", entry.path().to_string_lossy());
+        println!("{} of {}", matches, reference_hashset.len());
+    }
+}
+
+fn all_substrings(string: &str) -> HashSet<&str> {
+    let mut substrings = HashSet::new();
+    for start in 0..string.len() {
+        for end in start + 1..=string.len() {
+            substrings.insert(&string[start..end]);
+        }
+    }
+
+    substrings
+}
+
+fn largest_common_substring(str_1: &str, str_2: &str) -> Option<String> {
+    let substrings_str1 = all_substrings(str_1);
+    let mut largest: Option<&str> = None;
+
+    for substr in substrings_str1 {
+        if str_2.contains(substr) {
+            match largest {
+                Some(s) => {
+                    if substr.len() > s.len() {
+                        largest = Some(substr);
+                    }
+                }
+                None => largest = Some(substr),
             }
         }
     }
 
-    println!(
-        "{} elements = {reference_hashset:?}",
-        reference_hashset.len()
-    );
+    largest.map(|s| s.to_string())
 }
 
 fn read_file_header_chunk(file_path: &Path) -> Vec<u8> {
