@@ -56,6 +56,8 @@ fn main() {
     let reference_hashset = hashsets.remove(0);
     let mut common_elements = HashSet::new();
 
+    // TODO - would this be more efficient using a trie data structure instead?
+
     // Iterate through the remaining sets
     for set in hashsets {
         for string in &set {
