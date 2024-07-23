@@ -1,7 +1,12 @@
 [package]
 name = "identify_the_file"
 version = "0.1.0"
+authors = ["Ryan Jones-Ward <sciguyryan@gmail.com>"]
 edition = "2021"
+license = "LGPL-2.1-only"
+description = "A testing terminal for Redox"
+repository = "https://github.com/sciguyryan/Redox"
+homepage = "https://github.com/sciguyryan/Redox"
 
 [dependencies]
 hashbrown = "0.14.5"
