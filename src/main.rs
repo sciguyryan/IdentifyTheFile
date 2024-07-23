@@ -5,7 +5,7 @@ use std::{
     path::Path,
 };
 
-use hashbrown::{HashMap, HashSet};
+use hashbrown::HashSet;
 use walkdir::WalkDir;
 
 const FILE_CHUNK_SIZE: usize = 10 * 1024 * 1024; // 10 MB
@@ -14,8 +14,6 @@ const STRING_CHARS: [u8; 75] =
     *b" .,/abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890-+_.$<>?=";
 const MIN_STRING_LENGTH: usize = 5;
 const MAX_STRING_LENGTH: usize = 64;
-
-const HEADER_FRONT_SIZE: usize = 1024;
 
 fn main() {
     let file_dir = "D:\\GitHub\\IdentifyTheFile\\samples";
@@ -58,8 +56,15 @@ fn main() {
         return;
     }
 
-    // TODO - remove the smallest set, less searching.
-    let mut reference_hashset = hashsets.remove(0);
+    // Find the smallest set to minimize the search space.
+    let smallest_hashset_index = hashsets
+        .iter()
+        .enumerate()
+        .min_by_key(|(_, set)| set.len())
+        .map(|(index, _)| index)
+        .unwrap_or_else(|| 0);
+
+    let mut reference_hashset = hashsets.remove(smallest_hashset_index);
 
     // Find the intersection of all sets.
     for set in &hashsets {
