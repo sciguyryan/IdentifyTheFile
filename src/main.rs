@@ -44,9 +44,6 @@ fn main() {
         let new_hashset = generate_file_hashset(&chunk, &ref_chars);
 
         hashsets.push(new_hashset);
-
-        println!("-------------------------------------------------------");
-        println!("{hashsets:?}");
     }
 
     println!("-------------------------------------------------------");
@@ -62,7 +59,7 @@ fn main() {
         .enumerate()
         .min_by_key(|(_, set)| set.len())
         .map(|(index, _)| index)
-        .unwrap_or_else(|| 0);
+        .unwrap_or(0);
 
     let mut reference_hashset = hashsets.remove(smallest_hashset_index);
 
@@ -71,10 +68,7 @@ fn main() {
         let mut temp_set = reference_hashset.clone();
 
         for ref_string in &reference_hashset {
-            //println!("ref_string = {ref_string}");
-
             if set.contains(ref_string) {
-                //println!("exact match; skipping");
                 // Nothing to do here, the reference set already contains the item.
                 continue;
             }
@@ -90,7 +84,8 @@ fn main() {
                 }
             }
 
-            // Select the largest substring match.
+            // Attempt to find the largest substring match.
+            // If one is found, replace the original string with the substring.
             let largest_match = matches.iter().max_by_key(|s| s.len());
             if let Some(m) = largest_match {
                 temp_set.remove(ref_string);
@@ -98,6 +93,8 @@ fn main() {
             }
         }
 
+        // Update the reference hashmap to reduce the search space in future
+        // loop iterations.
         reference_hashset = temp_set;
     }
 
