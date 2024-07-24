@@ -1,4 +1,3 @@
-use core::str;
 use std::{
     cmp::min,
     collections::HashSet,
@@ -19,8 +18,8 @@ const MIN_STRING_LENGTH: usize = 5;
 const MAX_STRING_LENGTH: usize = 128;
 
 fn main() {
-    let file_dir = "D:\\Downloads\\YouTube";
-    let target_extension = "mkv";
+    let file_dir = "D:\\GitHub\\IdentifyTheFile\\samples";
+    let target_extension = "config";
 
     let ref_chars: HashSet<u8> = STRING_CHARS.iter().copied().collect();
 
@@ -56,35 +55,10 @@ fn main() {
         return;
     }
 
-    let mut hashsets_v1 = hashsets.clone();
-    let mut hashsets_v1a = hashsets.clone();
-    let mut hashsets_v2 = hashsets.clone();
-    let mut hashsets_v2a = hashsets.clone();
-
-    /*println!("Starting string analysis (v1)...");
-    let before_v1 = Instant::now();
-    let common_strings_hashset_v1 = analysis_v1(&mut hashsets_v1);
-    println!("Elapsed time (v1): {:.2?}", before_v1.elapsed());
-    println!("{}", common_strings_hashset_v1.len());
-    println!("------------------------------------------");
-
-    println!("Starting string analysis (v1a)...");
-    let before_v1a = Instant::now();
-    let common_strings_hashset_v1a = analysis_v1a(&mut hashsets_v1a);
-    println!("Elapsed time (v1a): {:.2?}", before_v1a.elapsed());
-    println!("{}", common_strings_hashset_v1a.len());
-    println!("------------------------------------------");*/
-
-    /*println!("Starting string analysis (v2)...");
-    let before_v2 = Instant::now();
-    let common_strings_hashset_v2 = analysis_v2(&mut hashsets_v2);
-    println!("Elapsed time (v2): {:.2?}", before_v2.elapsed());
-    println!("{}", common_strings_hashset_v2.len());
-    println!("------------------------------------------");*/
-
+    println!("-------------------------------------------------------");
     println!("Starting string analysis (v2a)...");
     let before_v2a = Instant::now();
-    let common_strings_hashset_v2a = analysis_v2a(&mut hashsets_v2a);
+    let common_strings_hashset_v2a = common_string_identification_v2a(&mut hashsets);
     println!("Elapsed time (v2a): {:.2?}", before_v2a.elapsed());
     println!("{}", common_strings_hashset_v2a.len());
     println!("------------------------------------------");
@@ -92,10 +66,25 @@ fn main() {
     let common_strings_hashset = common_strings_hashset_v2a;
 
     println!("-------------------------------------------------------");
-    println!("Final common strings hashset = {common_strings_hashset:?}");
+    println!("Final common strings = {common_strings_hashset:?}");
+    println!("-------------------------------------------------------");
 
+    test_matching_files(
+        file_dir,
+        target_extension,
+        &ref_chars,
+        &common_strings_hashset,
+    );
+}
+
+fn test_matching_files(
+    path: &str,
+    target_extension: &str,
+    ref_chars: &HashSet<u8>,
+    common_strings: &HashSet<String>,
+) {
     let mut all_success = true;
-    for entry in WalkDir::new(file_dir) {
+    for entry in WalkDir::new(path) {
         let entry = entry.unwrap();
         if !entry.file_type().is_file() {
             continue;
@@ -112,10 +101,10 @@ fn main() {
         }
 
         let chunk = read_file_header_chunk(entry.path()).expect("failed to read file");
-        let strings = generate_file_string_hashset(&chunk, &ref_chars);
+        let strings = generate_file_string_hashset(&chunk, ref_chars);
 
         let mut matches = 0;
-        for el in &common_strings_hashset {
+        for el in common_strings {
             for str in &strings {
                 if str.contains(el) {
                     matches += 1;
@@ -126,11 +115,11 @@ fn main() {
 
         println!("--------------------------------------");
         println!("{}", entry.path().to_string_lossy());
-        println!("{} of {}", matches, common_strings_hashset.len());
-        if matches == common_strings_hashset.len() {
-            println!("\x1b[92mSuccessful matching!\x1b[0m");
+        println!("{} of {}", matches, common_strings.len());
+        if matches == common_strings.len() {
+            //println!("\x1b[92mSuccessful matching!\x1b[0m");
         } else {
-            println!("\x1b[91mFailed matching!\x1b[0m");
+            //println!("\x1b[91mFailed matching!\x1b[0m");
             all_success = false;
         }
     }
@@ -142,7 +131,7 @@ fn main() {
     }
 }
 
-fn analysis_v2a(hashsets: &mut Vec<HashSet<String>>) -> HashSet<String> {
+fn common_string_identification_v2a(hashsets: &mut Vec<HashSet<String>>) -> HashSet<String> {
     // Find the smallest set to minimize the search space.
     let smallest_hashset_index = hashsets
         .iter()
@@ -154,13 +143,13 @@ fn analysis_v2a(hashsets: &mut Vec<HashSet<String>>) -> HashSet<String> {
 
     //println!("Original common strings hashset = {common_strings_hashset:?}");
 
-    let total = hashsets.len();
-    let mut i = 0;
+    //let total = hashsets.len();
+    //let mut i = 0;
 
     // Find the common strings between all of the hashsets.
     while !hashsets.is_empty() {
         //println!("String processing iteration {} of {}", i, total);
-        i += 1;
+        //i += 1;
 
         // Take the topmost hashset, allowing memory to be freed as we go.
         let mut set = hashsets.remove(0);
@@ -168,7 +157,7 @@ fn analysis_v2a(hashsets: &mut Vec<HashSet<String>>) -> HashSet<String> {
         // Extract the common elements between the new and common sets.
         let mut temp_set: HashSet<_> = common_strings_hashset.intersection(&set).cloned().collect();
 
-        // Only retain items -not- present in the temp set for analysis.
+        // Only retain items -not- present in the common set for analysis.
         set.retain(|s| !temp_set.contains(s));
 
         // Parallel iterate over the entries.
@@ -194,186 +183,6 @@ fn analysis_v2a(hashsets: &mut Vec<HashSet<String>>) -> HashSet<String> {
         }));
 
         // Update the common hashmap to reflect the new changes.
-        common_strings_hashset = temp_set;
-    }
-
-    common_strings_hashset
-}
-
-fn analysis_v2(hashsets: &mut Vec<HashSet<String>>) -> HashSet<String> {
-    // Find the smallest set to minimize the search space.
-    let smallest_hashset_index = hashsets
-        .iter()
-        .enumerate()
-        .min_by_key(|(_, set)| set.len())
-        .map(|(index, _)| index)
-        .unwrap_or(0);
-    let mut common_strings_hashset = hashsets.swap_remove(smallest_hashset_index);
-
-    //println!("Original common strings hashset = {common_strings_hashset:?}");
-
-    let total = hashsets.len();
-    let mut i = 0;
-
-    // Find the common strings between all of the hashsets.
-    while !hashsets.is_empty() {
-        //println!("String processing iteration {} of {}", i, total);
-        i += 1;
-
-        // Take the topmost hashset, allowing memory to be freed as we go.
-        let set = hashsets.remove(0);
-
-        let mut temp_set: HashSet<_> = common_strings_hashset.intersection(&set).cloned().collect();
-        let diff_set: HashSet<_> = set.difference(&common_strings_hashset).cloned().collect();
-
-        temp_set.par_extend(common_strings_hashset.par_iter().filter_map(|ref_string| {
-            let mut largest_match = "";
-
-            for string in &diff_set {
-                if ref_string == string {
-                    // We don't need to do anything here.
-                    continue;
-                }
-
-                // Are we able to match a substring between the reference and new string?
-                if let Some(s) = largest_common_substring(string, ref_string) {
-                    // Check if this is the largest match we've seen so far.
-                    if s.len() > largest_match.len() {
-                        largest_match = s;
-                    }
-                }
-            }
-
-            // Only insert if a match was found.
-            if !largest_match.is_empty() {
-                Some(largest_match.to_string())
-            } else {
-                None
-            }
-        }));
-
-        // Update the reference hashmap to reduce the search space in future
-        // loop iterations.
-        common_strings_hashset = temp_set;
-    }
-
-    common_strings_hashset
-}
-
-fn analysis_v1(hashsets: &mut Vec<HashSet<String>>) -> HashSet<String> {
-    // Find the smallest set to minimize the search space.
-    let smallest_hashset_index = hashsets
-        .iter()
-        .enumerate()
-        .min_by_key(|(_, set)| set.len())
-        .map(|(index, _)| index)
-        .unwrap_or(0);
-    let mut common_strings_hashset = hashsets.swap_remove(smallest_hashset_index);
-
-    //println!("Original common strings hashset = {common_strings_hashset:?}");
-
-    let total = hashsets.len();
-    let mut i = 0;
-
-    // Find the common strings between all of the hashsets.
-    while !hashsets.is_empty() {
-        //println!("String processing iteration {i} of {total}");
-        i += 1;
-
-        // Take the bottom hashset, allowing memory to be freed as we go.
-        let set = hashsets.remove(0);
-
-        // Iterate over each common string. In each iteration we prune
-        // strings that didn't match, making the process more efficient as
-        // with each passing cycle.
-        let mut temp_set = HashSet::new();
-        for common_string in &common_strings_hashset {
-            let mut largest_match = "";
-
-            for string in &set {
-                // If the strings are identical, we don't need to check for substring matches
-                // and we don't need to add the item to the hashmap since it's already there.
-                if common_string == string {
-                    continue;
-                }
-
-                // Are we able to find a substring match between the old and new strings?
-                if let Some(s) = largest_common_substring(string, common_string) {
-                    // Check if this is the largest match we've seen so far.
-                    if s.len() > largest_match.len() {
-                        largest_match = s;
-                    }
-                }
-            }
-
-            // Only insert if a match was found, otherwise we can retain
-            // items that aren't matches at all.
-            if !largest_match.is_empty() {
-                temp_set.insert(largest_match.to_string());
-            }
-        }
-
-        // Update the reference hashmap to reduce the search space in future
-        // loop iterations.
-        common_strings_hashset = temp_set;
-    }
-
-    common_strings_hashset
-}
-
-fn analysis_v1a(hashsets: &mut Vec<HashSet<String>>) -> HashSet<String> {
-    // Find the smallest set to minimize the search space.
-    let smallest_hashset_index = hashsets
-        .iter()
-        .enumerate()
-        .min_by_key(|(_, set)| set.len())
-        .map(|(index, _)| index)
-        .unwrap_or(0);
-    let mut common_strings_hashset = hashsets.swap_remove(smallest_hashset_index);
-
-    //println!("Original common strings hashset = {common_strings_hashset:?}");
-
-    let total = hashsets.len();
-    let mut i = 0;
-
-    // Find the common strings between all of the hashsets.
-    while !hashsets.is_empty() {
-        //println!("String processing iteration {i} of {total}");
-        i += 1;
-
-        // Take the bottom hashset, allowing memory to be freed as we go.
-        let mut set = hashsets.remove(0);
-        set.retain(|s| !common_strings_hashset.contains(s));
-
-        let mut temp_set = HashSet::new();
-        for common_string in &common_strings_hashset {
-            let mut largest_match = "";
-
-            for string in &set {
-                // If the strings are identical, we don't need to check for substring matches
-                // and we don't need to add the item to the hashmap since it's already there.
-                if common_string == string {
-                    continue;
-                }
-
-                // Are we able to find a substring match between the old and new strings?
-                if let Some(s) = largest_common_substring(string, common_string) {
-                    // Check if this is the largest match we've seen so far.
-                    if s.len() > largest_match.len() {
-                        largest_match = s;
-                    }
-                }
-            }
-
-            // Only insert if a match was found, otherwise we can retain
-            // items that aren't matches at all.
-            if !largest_match.is_empty() {
-                temp_set.insert(largest_match.to_string());
-            }
-        }
-
-        // Update the reference hashmap to reduce the search space in future
-        // loop iterations.
         common_strings_hashset = temp_set;
     }
 
