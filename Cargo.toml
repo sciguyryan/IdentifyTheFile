@@ -10,4 +10,5 @@ homepage = "https://github.com/sciguyryan/Redox"
 
 [dependencies]
 hashbrown = "0.14.5"
+rayon = "1.10.0"
 walkdir = "2.5.0"
