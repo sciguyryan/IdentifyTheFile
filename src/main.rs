@@ -2,7 +2,7 @@ use core::str;
 use std::{
     cmp::min,
     fs::File,
-    io::{BufReader, Read},
+    io::{self, BufReader, Read},
     path::Path,
     time::Instant,
 };
@@ -12,14 +12,14 @@ use walkdir::WalkDir;
 
 const FILE_CHUNK_SIZE: usize = 10 * 1024 * 1024; // 10 MB
 
-const STRING_CHARS: [u8; 75] =
-    *b" $+,-../0123456789<=>?ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz";
+const STRING_CHARS: [u8; 74] =
+    *b" $+,-./0123456789<=>?ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz";
 const MIN_STRING_LENGTH: usize = 5;
-const MAX_STRING_LENGTH: usize = 64;
+const MAX_STRING_LENGTH: usize = 128;
 
 fn main() {
     let file_dir = "D:\\GitHub\\IdentifyTheFile\\samples";
-    let target_extension = "config";
+    let target_extension = "mkv";
 
     let ref_chars: HashSet<u8> = STRING_CHARS.iter().copied().collect();
 
@@ -37,11 +37,14 @@ fn main() {
         };
 
         if skip {
+            println!("Skipping file - {}", entry.path().to_string_lossy());
             continue;
         }
 
+        println!("Candidate file - {}", entry.path().to_string_lossy());
+
         // If we made it here then we have a valid file.
-        let chunk = read_file_header_chunk(entry.path());
+        let chunk = read_file_header_chunk(entry.path()).expect("failed to read file");
         let new_hashset = generate_file_string_hashset(&chunk, &ref_chars);
 
         hashsets.push(new_hashset);
@@ -54,6 +57,8 @@ fn main() {
         return;
     }
 
+    println!("Starting string analysis...");
+
     // Find the smallest set to minimize the search space.
     let smallest_hashset_index = hashsets
         .iter()
@@ -61,40 +66,60 @@ fn main() {
         .min_by_key(|(_, set)| set.len())
         .map(|(index, _)| index)
         .unwrap_or(0);
+    let mut common_strings_hashset = hashsets.swap_remove(smallest_hashset_index);
 
-    let mut reference_hashset = hashsets.swap_remove(smallest_hashset_index);
+    println!("original common strings hashset = {common_strings_hashset:?}");
 
-    // Find the intersection of all sets.
-    for set in hashsets {
+    let total = hashsets.len();
+    let mut i = 0;
+
+    // Find the common strings between all of the hashsets.
+    while !hashsets.is_empty() {
+        println!("String processing iteration {i} of {total}");
+        i += 1;
+
+        // Take the bottom hashset, allowing memory to be freed as we go.
+        let set = hashsets.remove(0);
+
+        // Iterate over each common string. In each iteration we prune
+        // strings that didn't match, making the process more efficient as
+        // with each passing cycle.
         let mut temp_set = HashSet::new();
+        for common_string in &common_strings_hashset {
+            let mut largest_match = "";
 
-        for ref_string in &reference_hashset {
-            let mut matches = HashSet::new();
             for string in &set {
-                // Are we able to match a substring between the reference and new string?
-                if let Some(s) = largest_common_substring(string, ref_string) {
-                    matches.insert(s);
+                // If the strings are identical, we don't need to check for substring matches
+                // and we don't need to add the item to the hashmap since it's already there.
+                if common_string == string {
+                    continue;
+                }
+
+                // Are we able to find a substring match between the old and new strings?
+                if let Some(s) = largest_common_substring(string, common_string) {
+                    // Check if this is the largest match we've seen so far.
+                    if s.len() > largest_match.len() {
+                        largest_match = s;
+                    }
                 }
             }
 
-            // Attempt to find the largest substring match.
-            // If one is found, replace the original string with the substring.
-            if let Some(largest_match) = matches.into_iter().max_by_key(|s| s.len()) {
+            // Only insert if a match was found, otherwise we can retain
+            // items that aren't matches at all.
+            if !largest_match.is_empty() {
                 temp_set.insert(largest_match.to_string());
-            } else {
-                temp_set.insert(ref_string.to_string());
             }
         }
 
         // Update the reference hashmap to reduce the search space in future
         // loop iterations.
-        reference_hashset = temp_set;
+        common_strings_hashset = temp_set;
     }
 
     println!("Elapsed time: {:.2?}", before.elapsed());
 
     println!("-------------------------------------------------------");
-    println!("reference_hashset = {reference_hashset:?}");
+    println!("reference_hashset = {common_strings_hashset:?}");
 
     for entry in WalkDir::new(file_dir) {
         let entry = entry.unwrap();
@@ -102,21 +127,32 @@ fn main() {
             continue;
         }
 
-        let chunk = read_file_header_chunk(entry.path());
+        let ext = entry.path().extension();
+        let skip = match ext {
+            Some(str) => str != target_extension,
+            None => true,
+        };
+
+        if skip {
+            continue;
+        }
+
+        let chunk = read_file_header_chunk(entry.path()).expect("failed to read file");
         let strings = generate_file_string_hashset(&chunk, &ref_chars);
 
         let mut matches = 0;
-        for el in &reference_hashset {
+        for el in &common_strings_hashset {
             for str in &strings {
                 if str.contains(el) {
                     matches += 1;
+                    break;
                 }
             }
         }
 
         println!("--------------------------------------");
         println!("{}", entry.path().to_string_lossy());
-        println!("{} of {}", matches, reference_hashset.len());
+        println!("{} of {}", matches, common_strings_hashset.len());
     }
 }
 
@@ -141,15 +177,15 @@ fn largest_common_substring<'a>(str_1: &'a str, str_2: &str) -> Option<&'a str> 
         .find(|&substr| str_2.contains(substr))
 }
 
-fn read_file_header_chunk(file_path: &Path) -> Vec<u8> {
-    let file = File::open(file_path).expect("");
-    let filesize = file.metadata().unwrap().len() as usize;
+fn read_file_header_chunk(file_path: &Path) -> io::Result<Vec<u8>> {
+    let file = File::open(file_path)?;
+    let filesize = file.metadata()?.len() as usize;
     let read_size = min(filesize, FILE_CHUNK_SIZE);
     let mut buf_reader = BufReader::new(file);
     let mut buffer = vec![0; read_size];
-    buf_reader.read_exact(&mut buffer).expect("");
+    buf_reader.read_exact(&mut buffer)?;
 
-    buffer
+    Ok(buffer)
 }
 
 fn generate_file_string_hashset(bytes: &[u8], reference: &HashSet<u8>) -> HashSet<String> {
