@@ -1,8 +1,6 @@
+use core::str;
 use std::{
-    cmp::min,
-    fs::File,
-    io::{BufReader, Read},
-    path::Path,
+    cmp::min, fs::File, io::{BufReader, Read}, path::Path
 };
 
 use hashbrown::HashSet;
@@ -11,7 +9,7 @@ use walkdir::WalkDir;
 const FILE_CHUNK_SIZE: usize = 10 * 1024 * 1024; // 10 MB
 
 const STRING_CHARS: [u8; 75] =
-    *b" .,/abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890-+_.$<>?=";
+    *b" $+,-../0123456789<=>?ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz";
 const MIN_STRING_LENGTH: usize = 5;
 const MAX_STRING_LENGTH: usize = 64;
 
@@ -46,8 +44,6 @@ fn main() {
         hashsets.push(new_hashset);
     }
 
-    println!("-------------------------------------------------------");
-
     if hashsets.is_empty() {
         println!("No strings were found!");
         return;
@@ -61,20 +57,15 @@ fn main() {
         .map(|(index, _)| index)
         .unwrap_or(0);
 
-    let mut reference_hashset = hashsets.remove(smallest_hashset_index);
+    let mut reference_hashset = hashsets.swap_remove(smallest_hashset_index);
 
     // Find the intersection of all sets.
-    for set in &hashsets {
-        let mut temp_set = reference_hashset.clone();
+    for set in hashsets {
+        let mut temp_set = HashSet::new();
 
         for ref_string in &reference_hashset {
-            if set.contains(ref_string) {
-                // Nothing to do here, the reference set already contains the item.
-                continue;
-            }
-
             let mut matches = HashSet::new();
-            for string in set {
+            for string in &set {
                 // Are we able to match a substring between the reference and new string?
                 if let Some(s) = largest_common_substring(string, ref_string) {
                     // Don't add strings that are smaller than our minimum to reduce overhead.
@@ -86,10 +77,10 @@ fn main() {
 
             // Attempt to find the largest substring match.
             // If one is found, replace the original string with the substring.
-            let largest_match = matches.iter().max_by_key(|s| s.len());
-            if let Some(m) = largest_match {
-                temp_set.remove(ref_string);
-                temp_set.insert(m.clone());
+            if let Some(largest_match) = matches.into_iter().max_by_key(|s| s.len()) {
+                temp_set.insert(largest_match);
+            } else {
+                temp_set.insert(ref_string.clone());
             }
         }
 
@@ -127,8 +118,9 @@ fn main() {
 
 fn all_substrings(string: &str) -> HashSet<&str> {
     let mut substrings = HashSet::new();
-    for start in 0..string.len() {
-        for end in start + 1..=string.len() {
+    let len = string.len();
+    for start in 0..len {
+        for end in start + MIN_STRING_LENGTH..=len {
             substrings.insert(&string[start..end]);
         }
     }
