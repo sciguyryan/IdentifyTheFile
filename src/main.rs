@@ -19,7 +19,7 @@ const MIN_STRING_LENGTH: usize = 5;
 const MAX_STRING_LENGTH: usize = 128;
 
 fn main() {
-    let file_dir = "D:\\Downloads\\YouTube\\Brian's New Adventures in Baba Is You";
+    let file_dir = "D:\\Downloads\\YouTube";
     let target_extension = "mkv";
 
     let ref_chars: HashSet<u8> = STRING_CHARS.iter().copied().collect();
@@ -75,12 +75,12 @@ fn main() {
     println!("{}", common_strings_hashset_v1a.len());
     println!("------------------------------------------");*/
 
-    println!("Starting string analysis (v2)...");
+    /*println!("Starting string analysis (v2)...");
     let before_v2 = Instant::now();
     let common_strings_hashset_v2 = analysis_v2(&mut hashsets_v2);
     println!("Elapsed time (v2): {:.2?}", before_v2.elapsed());
     println!("{}", common_strings_hashset_v2.len());
-    println!("------------------------------------------");
+    println!("------------------------------------------");*/
 
     println!("Starting string analysis (v2a)...");
     let before_v2a = Instant::now();
@@ -88,13 +88,13 @@ fn main() {
     println!("Elapsed time (v2a): {:.2?}", before_v2a.elapsed());
     println!("{}", common_strings_hashset_v2a.len());
     println!("------------------------------------------");
-    return;
 
-    let common_strings_hashset = common_strings_hashset_v2;
+    let common_strings_hashset = common_strings_hashset_v2a;
 
     println!("-------------------------------------------------------");
     println!("Final common strings hashset = {common_strings_hashset:?}");
 
+    let mut all_success = true;
     for entry in WalkDir::new(file_dir) {
         let entry = entry.unwrap();
         if !entry.file_type().is_file() {
@@ -127,6 +127,18 @@ fn main() {
         println!("--------------------------------------");
         println!("{}", entry.path().to_string_lossy());
         println!("{} of {}", matches, common_strings_hashset.len());
+        if matches == common_strings_hashset.len() {
+            println!("\x1b[92mSuccessful matching!\x1b[0m");
+        } else {
+            println!("\x1b[91mFailed matching!\x1b[0m");
+            all_success = false;
+        }
+    }
+
+    if all_success {
+        println!("\x1b[92mSuccessfully matched all applicable items!\x1b[0m");
+    } else {
+        println!("\x1b[91mFailed to match one or more applicable items\x1b[0m");
     }
 }
 
