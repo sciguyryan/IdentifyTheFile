@@ -1,6 +1,10 @@
 use core::str;
 use std::{
-    cmp::min, fs::File, io::{BufReader, Read}, path::Path
+    cmp::min,
+    fs::File,
+    io::{BufReader, Read},
+    path::Path,
+    time::Instant,
 };
 
 use hashbrown::HashSet;
@@ -19,8 +23,7 @@ fn main() {
 
     let ref_chars: HashSet<u8> = STRING_CHARS.iter().copied().collect();
 
-    let mut hashsets: Vec<HashSet<String>> = Vec::new();
-
+    let mut hashsets = Vec::new();
     for entry in WalkDir::new(file_dir) {
         let entry = entry.unwrap();
         if !entry.file_type().is_file() {
@@ -39,10 +42,12 @@ fn main() {
 
         // If we made it here then we have a valid file.
         let chunk = read_file_header_chunk(entry.path());
-        let new_hashset = generate_file_hashset(&chunk, &ref_chars);
+        let new_hashset = generate_file_string_hashset(&chunk, &ref_chars);
 
         hashsets.push(new_hashset);
     }
+
+    let before = Instant::now();
 
     if hashsets.is_empty() {
         println!("No strings were found!");
@@ -68,19 +73,16 @@ fn main() {
             for string in &set {
                 // Are we able to match a substring between the reference and new string?
                 if let Some(s) = largest_common_substring(string, ref_string) {
-                    // Don't add strings that are smaller than our minimum to reduce overhead.
-                    if s.len() > MIN_STRING_LENGTH {
-                        matches.insert(s);
-                    }
+                    matches.insert(s);
                 }
             }
 
             // Attempt to find the largest substring match.
             // If one is found, replace the original string with the substring.
             if let Some(largest_match) = matches.into_iter().max_by_key(|s| s.len()) {
-                temp_set.insert(largest_match);
+                temp_set.insert(largest_match.to_string());
             } else {
-                temp_set.insert(ref_string.clone());
+                temp_set.insert(ref_string.to_string());
             }
         }
 
@@ -88,6 +90,8 @@ fn main() {
         // loop iterations.
         reference_hashset = temp_set;
     }
+
+    println!("Elapsed time: {:.2?}", before.elapsed());
 
     println!("-------------------------------------------------------");
     println!("reference_hashset = {reference_hashset:?}");
@@ -99,7 +103,7 @@ fn main() {
         }
 
         let chunk = read_file_header_chunk(entry.path());
-        let strings = generate_file_hashset(&chunk, &ref_chars);
+        let strings = generate_file_string_hashset(&chunk, &ref_chars);
 
         let mut matches = 0;
         for el in &reference_hashset {
@@ -116,36 +120,25 @@ fn main() {
     }
 }
 
-fn all_substrings(string: &str) -> HashSet<&str> {
-    let mut substrings = HashSet::new();
+fn all_substrings_over_min_size(string: &str) -> Vec<&str> {
+    let mut substrings = Vec::new();
     let len = string.len();
     for start in 0..len {
         for end in start + MIN_STRING_LENGTH..=len {
-            substrings.insert(&string[start..end]);
+            substrings.push(&string[start..end]);
         }
     }
 
     substrings
 }
 
-fn largest_common_substring(str_1: &str, str_2: &str) -> Option<String> {
-    let substrings_str1 = all_substrings(str_1);
-    let mut largest: Option<&str> = None;
+fn largest_common_substring<'a>(str_1: &'a str, str_2: &str) -> Option<&'a str> {
+    let mut substrings_str1 = all_substrings_over_min_size(str_1);
+    substrings_str1.sort_unstable_by_key(|b| std::cmp::Reverse(b.len()));
 
-    for substr in substrings_str1 {
-        if str_2.contains(substr) {
-            match largest {
-                Some(s) => {
-                    if substr.len() > s.len() {
-                        largest = Some(substr);
-                    }
-                }
-                None => largest = Some(substr),
-            }
-        }
-    }
-
-    largest.map(|s| s.to_string())
+    substrings_str1
+        .into_iter()
+        .find(|&substr| str_2.contains(substr))
 }
 
 fn read_file_header_chunk(file_path: &Path) -> Vec<u8> {
@@ -159,31 +152,35 @@ fn read_file_header_chunk(file_path: &Path) -> Vec<u8> {
     buffer
 }
 
-fn generate_file_hashset(bytes: &[u8], reference: &HashSet<u8>) -> HashSet<String> {
+fn generate_file_string_hashset(bytes: &[u8], reference: &HashSet<u8>) -> HashSet<String> {
     let mut string_map = HashSet::new();
 
-    let mut push_next = false;
+    let mut push_string = false;
     let mut string_buffer = String::with_capacity(MAX_STRING_LENGTH);
-    for byte in bytes {
-        if push_next {
+    for (i, byte) in bytes.iter().enumerate() {
+        // At the first non-valid string byte, we consider the string terminated.
+        if !reference.contains(byte) {
+            push_string = true;
+        } else {
+            // Push the character onto the buffer.
+            string_buffer.push(*byte as char);
+        }
+
+        // If the string is of the maximum length then we want to
+        // push it on the next iteration.
+        // We also want to push the string if this is the final byte.
+        if string_buffer.len() == MAX_STRING_LENGTH || i == bytes.len() - 1 {
+            push_string = true;
+        }
+
+        if push_string {
+            // Only retain strings that conform with the minimum length requirements.
             if string_buffer.len() >= MIN_STRING_LENGTH {
                 string_map.insert(string_buffer.to_uppercase());
             }
 
             string_buffer = String::with_capacity(MAX_STRING_LENGTH);
-            push_next = false;
-        }
-
-        if !reference.contains(byte) {
-            push_next = true;
-            continue;
-        }
-
-        // Push the character onto the buffer.
-        string_buffer.push(*byte as char);
-
-        if string_buffer.len() == MAX_STRING_LENGTH {
-            push_next = true;
+            push_string = false;
         }
     }
 
