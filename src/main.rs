@@ -19,15 +19,22 @@ const MAX_STRING_LENGTH: usize = 128;
 const VERBOSE: bool = false;
 
 fn main() {
+    let splitter = "-".repeat(54);
+    let half_splitter = "-".repeat(27);
+
     let file_dir = "D:\\GitHub\\IdentifyTheFile\\samples";
-    let target_extension = "mkv";
+    let target_extension = "xml";
 
     let ref_chars: HashSet<u8> = STRING_CHARS.iter().copied().collect();
 
-    let mut initial_file_temp: Option<Vec<u8>> = None;
+    let mut initial_file_temp = Vec::new();
     let mut common_byte_sequences = HashMap::new();
+    let mut first_byte_sequence_pass = true;
+
     let mut common_strings = Vec::new();
-    let mut shannon_entropy = Vec::new();
+
+    let mut entropy = Vec::new();
+
     let mut valid_sample_files = 0;
 
     for entry in WalkDir::new(file_dir) {
@@ -51,7 +58,10 @@ fn main() {
         // If we made it here then we have a valid file.
         let chunk = read_file_header_chunk(entry.path()).expect("failed to read file");
 
-        shannon_entropy.push(calculate_shannon_entropy(&chunk));
+        entropy.push((
+            entry.path().to_string_lossy().to_string(),
+            calculate_shannon_entropy(&chunk),
+        ));
 
         let new_hashset = generate_file_string_hashset(&chunk, &ref_chars);
         common_strings.push(new_hashset);
@@ -62,22 +72,26 @@ fn main() {
         // initial common sequences list from the first and second file headers.
         // Files that follow those will be used to refine the sequences already
         // identified.
-        if common_byte_sequences.is_empty() {
-            if let Some(file_1) = &initial_file_temp {
-                // Run the initial byte sequence scan.
-                common_byte_sequences = initial_common_byte_sequences_v1(file_1, &chunk);
+        // We only want to run the initial scan once, if the pool of entries
+        // is eventually depleted then it simply means there are no byte
+        // pattern matches in the specific file type.
+        if common_byte_sequences.is_empty() && !first_byte_sequence_pass {
+            initial_file_temp.push(chunk.clone());
 
-                // Clear the superfluous from memory.
-                initial_file_temp = None;
-            } else {
-                initial_file_temp = Some(chunk);
+            if initial_file_temp.len() == 2 {
+                let file_1 = initial_file_temp.pop().unwrap();
+                let file_2 = initial_file_temp.pop().unwrap();
+                common_byte_sequences = initial_common_byte_sequences_v1(&file_1, &file_2);
+
+                // We don't want to run this scan again.
+                first_byte_sequence_pass = true;
             }
         } else {
             refine_common_byte_sequences_v2(&chunk, &mut common_byte_sequences);
         }
     }
 
-    println!("-------------------------------------------------------");
+    /*println!("{splitter}");
     let max_entropy = shannon_entropy
         .iter()
         .cloned()
@@ -94,20 +108,28 @@ fn main() {
             None => Some(x),
             Some(y) => Some(y.min(x)),
         })
-        .unwrap();
+        .unwrap();*/
 
-    let sum_entropy: f64 = shannon_entropy.iter().sum();
-    let average_entropy = sum_entropy / (shannon_entropy.len() as f64);
-    let variation = ((max_entropy - min_entropy) / min_entropy) * 100f64;
+    let sum_entropy: f64 = entropy.iter().map(|(_, b)| b).sum();
+    let average_entropy = sum_entropy / (entropy.len() as f64);
+    //let variation = ((max_entropy - min_entropy) / min_entropy) * 100f64;
 
-    println!("-------------------------------------------------------");
-    println!("Valid sample files scanned {valid_sample_files}");
-    println!("-------------------------------------------------------");
-    println!("Maximum Entropy\t\t= {max_entropy}");
-    println!("Minimum Entropy\t\t= {min_entropy}");
+    println!("{splitter}");
+    println!("Valid sample files scanned: {valid_sample_files}");
+    println!("{splitter}");
+    //println!("Maximum Entropy\t\t= {max_entropy}");
+    //println!("Minimum Entropy\t\t= {min_entropy}");
     println!("Average Entropy\t\t= {average_entropy}");
-    println!("Entropy Variation\t= {variation}%");
-    println!("-------------------------------------------------------");
+    //println!("Entropy Variation\t= {variation}%");
+    println!("{half_splitter}");
+    println!("Entry deviations");
+    let deviations: Vec<f64> = entropy
+        .iter()
+        .map(|(_, value)| ((value - average_entropy).abs() / average_entropy) * 100.0)
+        .collect();
+    println!("{deviations:?}");
+
+    println!("{splitter}");
     println!("Matching positional byte sequences");
     print_byte_sequence_matches(&common_byte_sequences);
 
@@ -115,16 +137,16 @@ fn main() {
         println!("No common strings were found!");
     }
 
-    println!("-------------------------------------------------------");
+    println!("{splitter}");
     println!("Starting string sieve (v2a)...");
     let before_v2a = Instant::now();
     let common_strings_hashset_v2a = common_string_identification_v2a(&mut common_strings);
     println!("Elapsed time (v2a): {:.2?}", before_v2a.elapsed());
     println!("{}", common_strings_hashset_v2a.len());
-    println!("------------------------------------------");
+    println!("{splitter}");
     let common_strings_hashset = common_strings_hashset_v2a;
     println!("Final common strings = {common_strings_hashset:?}");
-    println!("-------------------------------------------------------");
+    println!("{splitter}");
 
     println!("Testing common string matches...");
     test_matching_file_strings(
@@ -161,6 +183,11 @@ fn test_matching_file_byte_sequences(
 ) {
     let mut all_success = true;
     for entry in WalkDir::new(path) {
+        // No sequences, we can skip the scan completely.
+        if sequences.is_empty() {
+            break;
+        }
+
         let entry = entry.unwrap();
         if !entry.file_type().is_file() {
             continue;
@@ -215,6 +242,11 @@ fn test_matching_file_strings(
 ) {
     let mut all_success = true;
     for entry in WalkDir::new(path) {
+        // No strings, we can skip the scan completely.
+        if common_strings.is_empty() {
+            break;
+        }
+
         let entry = entry.unwrap();
         if !entry.file_type().is_file() {
             continue;
@@ -267,7 +299,12 @@ fn refine_common_byte_sequences_v2(
     for (index, sequence) in common_byte_sequences.iter() {
         // If the final index would fall outside the bounds of the
         // chunk then read to the end of the chunk instead.
+        // If this still fall outside of the range of the file then we can't
+        // use this as a potential match.
         let segment_read_length = *index + sequence.len().min(file_bytes.len());
+        if segment_read_length > file_bytes.len() {
+            continue;
+        }
 
         // We can be certain that this will always fall within bounds.
         let new_segment = &file_bytes[*index..segment_read_length];
@@ -279,6 +316,12 @@ fn refine_common_byte_sequences_v2(
         }
 
         // Check to see if we can find a valid sub-match. If so, we'll retain that instead.
+        // TODO - it is possible that a segment should be broken into multiple pieces
+        // TODO - but that isn't handled yet. One example being this:
+        // TODO - pattern = [0, 1, 2, 3, 4]
+        // TODO - file_pattern = [0, 1, 1, 3, 4]
+        // TODO - from this we could extract two possible matches -
+        // TODO - [0, 1] at position 0 and [3, 4] at position 3.
         let mut new_length = segment_read_length;
         for i in 0..segment_read_length {
             if sequence[i] != new_segment[i] {
