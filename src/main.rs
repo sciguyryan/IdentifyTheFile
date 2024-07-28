@@ -27,6 +27,7 @@ fn main() {
     let mut initial_file_temp: Option<Vec<u8>> = None;
     let mut common_byte_sequences = HashMap::new();
     let mut common_strings = Vec::new();
+    let mut shannon_entropy = Vec::new();
     let mut valid_sample_files = 0;
 
     for entry in WalkDir::new(file_dir) {
@@ -49,6 +50,8 @@ fn main() {
 
         // If we made it here then we have a valid file.
         let chunk = read_file_header_chunk(entry.path()).expect("failed to read file");
+
+        shannon_entropy.push(calculate_shannon_entropy(&chunk));
 
         let new_hashset = generate_file_string_hashset(&chunk, &ref_chars);
         common_strings.push(new_hashset);
@@ -75,7 +78,35 @@ fn main() {
     }
 
     println!("-------------------------------------------------------");
+    let max_entropy = shannon_entropy
+        .iter()
+        .cloned()
+        .fold(None, |max, x| match max {
+            None => Some(x),
+            Some(y) => Some(y.max(x)),
+        })
+        .unwrap();
+
+    let min_entropy = shannon_entropy
+        .iter()
+        .cloned()
+        .fold(None, |max, x| match max {
+            None => Some(x),
+            Some(y) => Some(y.min(x)),
+        })
+        .unwrap();
+
+    let sum_entropy: f64 = shannon_entropy.iter().sum();
+    let average_entropy = sum_entropy / (shannon_entropy.len() as f64);
+    let variation = ((max_entropy - min_entropy) / min_entropy) * 100f64;
+
+    println!("-------------------------------------------------------");
     println!("Valid sample files scanned {valid_sample_files}");
+    println!("-------------------------------------------------------");
+    println!("Maximum Entropy\t\t= {max_entropy}");
+    println!("Minimum Entropy\t\t= {min_entropy}");
+    println!("Average Entropy\t\t= {average_entropy}");
+    println!("Entropy Variation\t= {variation}%");
     println!("-------------------------------------------------------");
     println!("Matching positional byte sequences");
     print_byte_sequence_matches(&common_byte_sequences);
@@ -370,6 +401,26 @@ fn common_string_identification_v2a(hashsets: &mut Vec<HashSet<String>>) -> Hash
     }
 
     final_hashset
+}
+
+fn calculate_shannon_entropy(data: &[u8]) -> f64 {
+    // Count the frequency of each bute in the input data.
+    let mut frequency = HashMap::new();
+    for b in data {
+        *frequency.entry(b).or_insert(0) += 1;
+    }
+
+    // Calculate the total range of bytes.
+    let total_bytes = data.len() as f64;
+
+    // Compute the entropy
+    let mut entropy = 0.0;
+    for &count in frequency.values() {
+        let probability = count as f64 / total_bytes;
+        entropy -= probability * probability.log2();
+    }
+
+    entropy
 }
 
 fn all_substrings_over_min_size(string: &str) -> Vec<&str> {
