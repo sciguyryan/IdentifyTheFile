@@ -123,11 +123,11 @@ fn main() {
     //println!("Entropy Variation\t= {variation}%");
     println!("{half_splitter}");
     println!("Entry deviations");
-    let deviations: Vec<f64> = entropy
+    /*let deviations: Vec<f64> = entropy
         .iter()
         .map(|(_, value)| ((value - average_entropy).abs() / average_entropy) * 100.0)
         .collect();
-    println!("{deviations:?}");
+    println!("{deviations:?}");*/
 
     println!("{splitter}");
     println!("Matching positional byte sequences");
@@ -308,12 +308,6 @@ fn refine_common_byte_sequences_v2(
 
         // We can be certain that this will always fall within bounds.
         let new_segment = &file_bytes[*index..segment_read_length];
-
-        // Fast path exit for a complete match.
-        if sequence == new_segment {
-            refined_sequence.insert(*index, sequence.clone());
-            continue;
-        }
 
         // Check to see if we can find a valid sub-match. If so, we'll retain that instead.
         // TODO - it is possible that a segment should be broken into multiple pieces
