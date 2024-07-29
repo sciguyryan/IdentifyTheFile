@@ -16,14 +16,18 @@ const STRING_CHARS: [u8; 74] =
 const MIN_STRING_LENGTH: usize = 5;
 const MAX_STRING_LENGTH: usize = 128;
 
+// TODO - use these!
+const MIN_SEQUENCE_LENGTH: usize = 1;
+const MAX_SEQUENCE_LENGTH: usize = 16;
+
 const VERBOSE: bool = false;
 
 fn main() {
     let splitter = "-".repeat(54);
     let half_splitter = "-".repeat(27);
 
-    let file_dir = "D:\\GitHub\\IdentifyTheFile\\samples";
-    let target_extension = "xml";
+    let file_dir = "D:\\GitHub\\IdentifyTheFile\\samples\\mkv";
+    let target_extension = "mkv";
 
     let ref_chars: HashSet<u8> = STRING_CHARS.iter().copied().collect();
 
@@ -75,7 +79,7 @@ fn main() {
         // We only want to run the initial scan once, if the pool of entries
         // is eventually depleted then it simply means there are no byte
         // pattern matches in the specific file type.
-        if common_byte_sequences.is_empty() && !first_byte_sequence_pass {
+        if common_byte_sequences.is_empty() && first_byte_sequence_pass {
             initial_file_temp.push(chunk.clone());
 
             if initial_file_temp.len() == 2 {
@@ -84,7 +88,7 @@ fn main() {
                 common_byte_sequences = initial_common_byte_sequences_v1(&file_1, &file_2);
 
                 // We don't want to run this scan again.
-                first_byte_sequence_pass = true;
+                first_byte_sequence_pass = false;
             }
         } else {
             refine_common_byte_sequences_v2(&chunk, &mut common_byte_sequences);
@@ -208,6 +212,9 @@ fn test_matching_file_byte_sequences(
 
             if sequence == &chunk[*start..end] {
                 matches += 1;
+            } else {
+                println!("start = {start}");
+                println!("{sequence:?} != {:?}", &chunk[*start..end]);
             }
         }
 
@@ -218,9 +225,9 @@ fn test_matching_file_byte_sequences(
         }
 
         if matches == sequences.len() {
-            //println!("\x1b[92mSuccessful byte sequence matching!\x1b[0m");
+            println!("\x1b[92mSuccessful byte sequence matching!\x1b[0m");
         } else {
-            //println!("\x1b[91mFailed byte sequence matching!\x1b[0m");
+            println!("\x1b[91mFailed byte sequence matching!\x1b[0m");
             all_success = false;
         }
 
@@ -290,59 +297,89 @@ fn test_matching_file_strings(
     }
 }
 
+fn extract_matching_sequences(vec1: &[u8], vec2: &[u8]) -> HashMap<usize, Vec<u8>> {
+    let mut result = HashMap::new();
+    let mut sequence_start = None;
+    let mut subsequence = Vec::new();
+
+    for (i, (&a, &b)) in vec1.iter().zip(vec2.iter()).enumerate() {
+        if a == b {
+            // Start a new sequence, if we aren't already in one.
+            if sequence_start.is_none() {
+                sequence_start = Some(i);
+            }
+            subsequence.push(a);
+
+            continue;
+        }
+
+        if let Some(start) = sequence_start {
+            // End the current sequence and store it if the sequence isn't empty.
+            if !subsequence.is_empty() {
+                result.insert(start, subsequence.clone());
+            }
+
+            sequence_start = None;
+            subsequence.clear();
+        }
+    }
+
+    // Check for any remaining sequence at the end
+    if let Some(start) = sequence_start {
+        if !subsequence.is_empty() {
+            result.insert(start, subsequence);
+        }
+    }
+
+    result
+}
+
 fn refine_common_byte_sequences_v2(
     file_bytes: &[u8],
     common_byte_sequences: &mut HashMap<usize, Vec<u8>>,
 ) {
-    let mut refined_sequence = HashMap::with_capacity(common_byte_sequences.len());
+    let mut refined_sequences = HashMap::with_capacity(common_byte_sequences.len());
 
-    for (index, sequence) in common_byte_sequences.iter() {
+    for (index, test_sequence) in common_byte_sequences.iter() {
+        if *index > file_bytes.len() {
+            continue;
+        }
+
         // If the final index would fall outside the bounds of the
         // chunk then read to the end of the chunk instead.
         // If this still fall outside of the range of the file then we can't
         // use this as a potential match.
-        let segment_read_length = *index + sequence.len().min(file_bytes.len());
+        let segment_read_length = (*index + test_sequence.len()).min(file_bytes.len());
         if segment_read_length > file_bytes.len() {
             continue;
         }
 
-        // We can be certain that this will always fall within bounds.
-        let new_segment = &file_bytes[*index..segment_read_length];
+        let subsequences =
+            extract_matching_sequences(test_sequence, &file_bytes[*index..segment_read_length]);
 
-        // Check to see if we can find a valid sub-match. If so, we'll retain that instead.
-        // TODO - it is possible that a segment should be broken into multiple pieces
-        // TODO - but that isn't handled yet. One example being this:
-        // TODO - pattern = [0, 1, 2, 3, 4]
-        // TODO - file_pattern = [0, 1, 1, 3, 4]
-        // TODO - from this we could extract two possible matches -
-        // TODO - [0, 1] at position 0 and [3, 4] at position 3.
-        let mut new_length = segment_read_length;
-        for i in 0..segment_read_length {
-            if sequence[i] != new_segment[i] {
-                new_length = i;
-                break;
-            }
-        }
-
-        if new_length > 0 {
-            refined_sequence.insert(*index, sequence[..new_length].to_vec());
+        // Note - remember that the index in the sequence list is absolute
+        // over the entire file, not the substring. This means we need
+        // to add the overall index to the sub index!
+        for (sub_index, seq) in subsequences {
+            refined_sequences.insert(*index + sub_index, seq);
         }
     }
 
-    *common_byte_sequences = refined_sequence;
+    *common_byte_sequences = refined_sequences;
 }
 
+// TODO - rewrite to be similar to extract_matching_sequences since the format is cleaner?
 fn initial_common_byte_sequences_v1(
     file_1_bytes: &[u8],
     file_2_bytes: &[u8],
 ) -> HashMap<usize, Vec<u8>> {
-    let mut common_byte_sequences = HashMap::new();
+    let mut common_sequences = HashMap::new();
 
     let mut sequence_start = 0;
     let mut sequence_end;
     let mut in_sequence = false;
-    for (i, b) in file_1_bytes.iter().enumerate() {
-        if i < file_2_bytes.len() && file_2_bytes[i] == *b {
+    for (i, (&b1, &b2)) in file_1_bytes.iter().zip(file_2_bytes.iter()).enumerate() {
+        if b1 == b2 && i < file_1_bytes.len() - 1 {
             // Indicate the start of the matching sequence, if we aren't already
             // within a sequence.
             if !in_sequence {
@@ -354,14 +391,18 @@ fn initial_common_byte_sequences_v1(
         }
 
         // We have reached the end of the matching sequence.
-        sequence_end = i;
-        in_sequence = false;
+        if in_sequence {
+            sequence_end = i;
+            let sequence = file_1_bytes[sequence_start..sequence_end].to_vec();
+            if !sequence.is_empty() {
+                common_sequences.insert(sequence_start, sequence);
+            }
 
-        let sequence = file_1_bytes[sequence_start..sequence_end].to_vec();
-        common_byte_sequences.insert(sequence_start, sequence);
+            in_sequence = false;
+        }
     }
 
-    common_byte_sequences
+    common_sequences
 }
 
 fn common_string_identification_v2a(hashsets: &mut Vec<HashSet<String>>) -> HashSet<String> {
