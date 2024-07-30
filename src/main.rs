@@ -176,6 +176,10 @@ fn test_matching_file_byte_sequences(
 
         let chunk = read_file_header_chunk(file_path).expect("failed to read file");
 
+        if VERBOSE {
+            println!("--------------------------------------");
+        }
+
         let mut matches = 0;
         for (start, sequence) in sequences {
             let end = *start + sequence.len();
@@ -186,8 +190,10 @@ fn test_matching_file_byte_sequences(
             if sequence == &chunk[*start..end] {
                 matches += 1;
             } else {
-                println!("start = {start}");
-                println!("{sequence:?} != {:?}", &chunk[*start..end]);
+                if VERBOSE {
+                    println!("start = {start}");
+                    println!("{sequence:?} != {:?}", &chunk[*start..end]);
+                }
             }
         }
 
