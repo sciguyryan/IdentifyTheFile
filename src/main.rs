@@ -2,12 +2,11 @@ use std::{
     collections::{HashMap, HashSet},
     fs::File,
     io::{self, BufReader, Read},
-    path::Path,
     time::Instant,
 };
 
 use rayon::prelude::*;
-use walkdir::{DirEntry, WalkDir};
+use walkdir::WalkDir;
 
 const FILE_CHUNK_SIZE: usize = 10 * 1024 * 1024; // 10 MB
 
@@ -26,12 +25,13 @@ fn main() {
     let splitter = "-".repeat(54);
     let half_splitter = "-".repeat(27);
 
-    let file_dir = "D:\\GitHub\\IdentifyTheFile\\samples\\mkv";
+    //let file_dir = "D:\\GitHub\\IdentifyTheFile\\samples\\mkv";
+    let file_dir = "D:\\Downloads\\YouTube";
     let target_extension = "mkv";
+    let files = list_files_of_type(file_dir, target_extension);
 
     let ref_chars: HashSet<u8> = STRING_CHARS.iter().copied().collect();
 
-    let mut initial_file_temp = Vec::new();
     let mut common_byte_sequences = HashMap::new();
     let mut first_byte_sequence_pass = true;
 
@@ -39,60 +39,28 @@ fn main() {
 
     let mut entropy = Vec::new();
 
-    let mut valid_sample_files = 0;
-
-    for entry in WalkDir::new(file_dir) {
-        let entry = entry.unwrap();
-        if !entry.file_type().is_file() {
-            continue;
-        }
-
-        if !path_has_correct_extension(&entry, target_extension) {
-            if VERBOSE {
-                println!("Skipping file - {}", entry.path().to_string_lossy());
-            }
-            continue;
-        }
-
+    for file_path in &files {
         if VERBOSE {
-            println!("Candidate file - {}", entry.path().to_string_lossy());
+            println!("Analyzing candidate file - {file_path}");
         }
-        valid_sample_files += 1;
 
         // If we made it here then we have a valid file.
-        let chunk = read_file_header_chunk(entry.path()).expect("failed to read file");
+        let chunk = read_file_header_chunk(file_path).expect("failed to read file");
 
-        entropy.push((
-            entry.path().to_string_lossy().to_string(),
-            calculate_shannon_entropy(&chunk),
-        ));
+        entropy.push((file_path, calculate_shannon_entropy(&chunk)));
 
         let new_hashset = generate_file_string_hashset(&chunk, &ref_chars);
         common_strings.push(new_hashset);
 
-        // We want to avoid holding the header blocks of every file we scan,
-        // because that could have significant memory implications.
-        // Instead, we store the first file's header and then build the
-        // initial common sequences list from the first and second file headers.
-        // Files that follow those will be used to refine the sequences already
-        // identified.
-        // We only want to run the initial scan once, if the pool of entries
-        // is eventually depleted then it simply means there are no byte
-        // pattern matches in the specific file type.
-        if common_byte_sequences.is_empty() && first_byte_sequence_pass {
-            initial_file_temp.push(chunk.clone());
-
-            if initial_file_temp.len() == 2 {
-                let file_1 = initial_file_temp.pop().unwrap();
-                let file_2 = initial_file_temp.pop().unwrap();
-                common_byte_sequences = initial_common_byte_sequences_v1(&file_1, &file_2);
-
-                // We don't want to run this scan again.
-                first_byte_sequence_pass = false;
-            }
-        } else {
-            refine_common_byte_sequences_v2(&chunk, &mut common_byte_sequences);
+        // On the first pass, we simply set the matching sequence as the entire byte block.
+        // This will get trimmed down and split into sections over future loop iterations.
+        if first_byte_sequence_pass {
+            common_byte_sequences.insert(0, chunk);
+            first_byte_sequence_pass = false;
+            continue;
         }
+
+        refine_common_byte_sequences_v2(&chunk, &mut common_byte_sequences);
     }
 
     /*println!("{splitter}");
@@ -119,7 +87,7 @@ fn main() {
     //let variation = ((max_entropy - min_entropy) / min_entropy) * 100f64;
 
     println!("{splitter}");
-    println!("Valid sample files scanned: {valid_sample_files}");
+    println!("Valid sample files scanned: {}", files.len());
     println!("{splitter}");
     //println!("Maximum Entropy\t\t= {max_entropy}");
     //println!("Minimum Entropy\t\t= {min_entropy}");
@@ -164,11 +132,24 @@ fn main() {
     test_matching_file_byte_sequences(file_dir, target_extension, &common_byte_sequences);
 }
 
-fn path_has_correct_extension(entry: &DirEntry, ext: &str) -> bool {
-    match entry.path().extension() {
-        Some(str) => str == ext,
-        None => true,
+fn list_files_of_type(dir: &str, target_ext: &str) -> Vec<String> {
+    let mut mkv_files = Vec::new();
+
+    for entry in WalkDir::new(dir)
+        .into_iter()
+        .filter_map(Result::ok)
+        .filter(|e| e.path().is_file())
+    {
+        if let Some(ext) = entry.path().extension() {
+            if ext == target_ext {
+                if let Some(path_str) = entry.path().to_str() {
+                    mkv_files.push(path_str.to_string());
+                }
+            }
+        }
     }
+
+    mkv_files
 }
 
 fn print_byte_sequence_matches(sequences: &HashMap<usize, Vec<u8>>) {
@@ -186,22 +167,14 @@ fn test_matching_file_byte_sequences(
     sequences: &HashMap<usize, Vec<u8>>,
 ) {
     let mut all_success = true;
-    for entry in WalkDir::new(path) {
+    let files = list_files_of_type(path, target_extension);
+    for file_path in &files {
         // No sequences, we can skip the scan completely.
         if sequences.is_empty() {
             break;
         }
 
-        let entry = entry.unwrap();
-        if !entry.file_type().is_file() {
-            continue;
-        }
-
-        if !path_has_correct_extension(&entry, target_extension) {
-            continue;
-        }
-
-        let chunk = read_file_header_chunk(entry.path()).expect("failed to read file");
+        let chunk = read_file_header_chunk(file_path).expect("failed to read file");
 
         let mut matches = 0;
         for (start, sequence) in sequences {
@@ -220,14 +193,14 @@ fn test_matching_file_byte_sequences(
 
         if VERBOSE {
             println!("--------------------------------------");
-            println!("{}", entry.path().to_string_lossy());
+            println!("{file_path}");
             println!("{} of {}", matches, sequences.len());
         }
 
         if matches == sequences.len() {
-            println!("\x1b[92mSuccessful byte sequence matching!\x1b[0m");
+            //println!("\x1b[92mSuccessful byte sequence matching!\x1b[0m");
         } else {
-            println!("\x1b[91mFailed byte sequence matching!\x1b[0m");
+            //println!("\x1b[91mFailed byte sequence matching!\x1b[0m");
             all_success = false;
         }
 
@@ -248,22 +221,15 @@ fn test_matching_file_strings(
     common_strings: &HashSet<String>,
 ) {
     let mut all_success = true;
-    for entry in WalkDir::new(path) {
+
+    let files = list_files_of_type(path, target_extension);
+    for file_path in &files {
         // No strings, we can skip the scan completely.
         if common_strings.is_empty() {
             break;
         }
 
-        let entry = entry.unwrap();
-        if !entry.file_type().is_file() {
-            continue;
-        }
-
-        if !path_has_correct_extension(&entry, target_extension) {
-            continue;
-        }
-
-        let chunk = read_file_header_chunk(entry.path()).expect("failed to read file");
+        let chunk = read_file_header_chunk(file_path).expect("failed to read file");
         let strings = generate_file_string_hashset(&chunk, ref_chars);
 
         let mut matches = 0;
@@ -278,7 +244,7 @@ fn test_matching_file_strings(
 
         if VERBOSE {
             println!("--------------------------------------");
-            println!("{}", entry.path().to_string_lossy());
+            println!("{file_path}");
             println!("{} of {}", matches, common_strings.len());
         }
 
@@ -366,43 +332,6 @@ fn refine_common_byte_sequences_v2(
     }
 
     *common_byte_sequences = refined_sequences;
-}
-
-// TODO - rewrite to be similar to extract_matching_sequences since the format is cleaner?
-fn initial_common_byte_sequences_v1(
-    file_1_bytes: &[u8],
-    file_2_bytes: &[u8],
-) -> HashMap<usize, Vec<u8>> {
-    let mut common_sequences = HashMap::new();
-
-    let mut sequence_start = 0;
-    let mut sequence_end;
-    let mut in_sequence = false;
-    for (i, (&b1, &b2)) in file_1_bytes.iter().zip(file_2_bytes.iter()).enumerate() {
-        if b1 == b2 && i < file_1_bytes.len() - 1 {
-            // Indicate the start of the matching sequence, if we aren't already
-            // within a sequence.
-            if !in_sequence {
-                sequence_start = i;
-                in_sequence = true;
-            }
-
-            continue;
-        }
-
-        // We have reached the end of the matching sequence.
-        if in_sequence {
-            sequence_end = i;
-            let sequence = file_1_bytes[sequence_start..sequence_end].to_vec();
-            if !sequence.is_empty() {
-                common_sequences.insert(sequence_start, sequence);
-            }
-
-            in_sequence = false;
-        }
-    }
-
-    common_sequences
 }
 
 fn common_string_identification_v2a(hashsets: &mut Vec<HashSet<String>>) -> HashSet<String> {
@@ -522,7 +451,7 @@ fn largest_common_substring<'a>(str_1: &'a str, str_2: &str) -> Option<&'a str> 
         .find(|&substr| str_2.contains(substr))
 }
 
-fn read_file_header_chunk(file_path: &Path) -> io::Result<Vec<u8>> {
+fn read_file_header_chunk(file_path: &str) -> io::Result<Vec<u8>> {
     let file = File::open(file_path)?;
     let filesize = file.metadata()?.len() as usize;
     let read_size = filesize.min(FILE_CHUNK_SIZE);
