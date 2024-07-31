@@ -25,8 +25,8 @@ fn main() {
     let splitter = "-".repeat(54);
     let half_splitter = "-".repeat(27);
 
-    //let file_dir = "D:\\GitHub\\IdentifyTheFile\\samples\\mkv";
-    let file_dir = "D:\\Downloads\\YouTube";
+    let file_dir = "D:\\GitHub\\IdentifyTheFile\\samples\\mkv";
+    //let file_dir = "D:\\Downloads\\YouTube";
     let target_extension = "mkv";
     let files = list_files_of_type(file_dir, target_extension);
 
@@ -82,17 +82,17 @@ fn main() {
         })
         .unwrap();*/
 
-    let sum_entropy: f64 = entropy.iter().map(|(_, b)| b).sum();
+    let sum_entropy: f64 = entropy.iter().map(|(_, (b, _))| b).sum();
     let average_entropy = sum_entropy / (entropy.len() as f64);
     //let variation = ((max_entropy - min_entropy) / min_entropy) * 100f64;
 
     println!("{splitter}");
     println!("Valid sample files scanned: {}", files.len());
     println!("{splitter}");
-    //println!("Maximum Entropy\t\t= {max_entropy}");
-    //println!("Minimum Entropy\t\t= {min_entropy}");
-    println!("Average Entropy\t\t= {average_entropy}");
-    //println!("Entropy Variation\t= {variation}%");
+    //println!("Maximum Entropy = {max_entropy}");
+    //println!("Minimum Entropy = {min_entropy}");
+    println!("Average Entropy = {average_entropy}");
+    //println!("Entropy Variation = {variation}%");
     println!("{half_splitter}");
     println!("Entry deviations");
     /*let deviations: Vec<f64> = entropy
@@ -269,12 +269,13 @@ fn test_matching_file_strings(
     }
 }
 
-fn extract_matching_sequences(vec1: &[u8], vec2: &[u8]) -> HashMap<usize, Vec<u8>> {
-    let mut result = HashMap::new();
+#[inline]
+fn extract_matching_sequences(seq_1: &[u8], seq_2: &[u8]) -> HashMap<usize, Vec<u8>> {
+    let mut subsequences = HashMap::new();
     let mut sequence_start = None;
-    let mut subsequence = Vec::new();
+    let mut subsequence = Vec::with_capacity(seq_1.len().min(seq_2.len()));
 
-    for (i, (&a, &b)) in vec1.iter().zip(vec2.iter()).enumerate() {
+    for (i, (&a, &b)) in seq_1.iter().zip(seq_2.iter()).enumerate() {
         if a == b {
             // Start a new sequence, if we aren't already in one.
             if sequence_start.is_none() {
@@ -288,7 +289,7 @@ fn extract_matching_sequences(vec1: &[u8], vec2: &[u8]) -> HashMap<usize, Vec<u8
         if let Some(start) = sequence_start {
             // End the current sequence and store it if the sequence isn't empty.
             if !subsequence.is_empty() {
-                result.insert(start, subsequence.clone());
+                subsequences.insert(start, std::mem::take(&mut subsequence));
             }
 
             sequence_start = None;
@@ -299,18 +300,18 @@ fn extract_matching_sequences(vec1: &[u8], vec2: &[u8]) -> HashMap<usize, Vec<u8
     // Check for any remaining sequence at the end
     if let Some(start) = sequence_start {
         if !subsequence.is_empty() {
-            result.insert(start, subsequence);
+            subsequences.insert(start, subsequence);
         }
     }
 
-    result
+    subsequences
 }
 
 fn refine_common_byte_sequences_v2(
     file_bytes: &[u8],
     common_byte_sequences: &mut HashMap<usize, Vec<u8>>,
 ) {
-    let mut refined_sequences = HashMap::with_capacity(common_byte_sequences.len());
+    let mut final_sequences = HashMap::with_capacity(common_byte_sequences.len());
 
     for (index, test_sequence) in common_byte_sequences.iter() {
         if *index > file_bytes.len() {
@@ -319,9 +320,9 @@ fn refine_common_byte_sequences_v2(
 
         // If the final index would fall outside the bounds of the
         // chunk then read to the end of the chunk instead.
-        // If this still fall outside of the range of the file then we can't
-        // use this as a potential match.
-        let segment_read_length = (*index + test_sequence.len()).min(file_bytes.len());
+        // If this still fall outside of the range (such as if index would be past the end of the file)
+        // then this can't be a match for our candidate file.
+        let segment_read_length = index.saturating_add(test_sequence.len().min(file_bytes.len()));
         if segment_read_length > file_bytes.len() {
             continue;
         }
@@ -333,11 +334,11 @@ fn refine_common_byte_sequences_v2(
         // over the entire file, not the substring. This means we need
         // to add the overall index to the sub index!
         for (sub_index, seq) in subsequences {
-            refined_sequences.insert(*index + sub_index, seq);
+            final_sequences.insert(*index + sub_index, seq);
         }
     }
 
-    *common_byte_sequences = refined_sequences;
+    *common_byte_sequences = final_sequences;
 }
 
 fn common_string_identification_v2a(hashsets: &mut Vec<HashSet<String>>) -> HashSet<String> {
@@ -416,11 +417,13 @@ fn common_string_identification_v2a(hashsets: &mut Vec<HashSet<String>>) -> Hash
     final_hashset
 }
 
-fn calculate_shannon_entropy(data: &[u8]) -> f64 {
+fn calculate_shannon_entropy(data: &[u8]) -> (f64, HashMap<u8, u8>) {
     // Count the frequency of each bute in the input data.
-    let mut frequency = HashMap::new();
+    let mut frequencies = HashMap::new();
+
+    // Count and classify the bytes.
     for b in data {
-        *frequency.entry(b).or_insert(0) += 1;
+        *frequencies.entry(*b).or_insert(0) += 1;
     }
 
     // Calculate the total range of bytes.
@@ -428,12 +431,12 @@ fn calculate_shannon_entropy(data: &[u8]) -> f64 {
 
     // Compute the entropy
     let mut entropy = 0.0;
-    for &count in frequency.values() {
+    for &count in frequencies.values() {
         let probability = count as f64 / total_bytes;
         entropy -= probability * probability.log2();
     }
 
-    entropy
+    (entropy, frequencies)
 }
 
 fn all_substrings_over_min_size(string: &str) -> Vec<&str> {
