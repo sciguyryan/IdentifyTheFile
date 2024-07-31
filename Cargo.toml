@@ -9,5 +9,6 @@ repository = "https://github.com/sciguyryan/Redox"
 homepage = "https://github.com/sciguyryan/Redox"
 
 [dependencies]
+chrono = "0.4.38"
 rayon = "1.10.0"
 walkdir = "2.5.0"
