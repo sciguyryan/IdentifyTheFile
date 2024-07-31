@@ -1,3 +1,5 @@
+mod pattern_file;
+
 use std::{
     collections::{HashMap, HashSet},
     fs::File,
@@ -9,15 +11,12 @@ use rayon::prelude::*;
 use walkdir::WalkDir;
 
 const FILE_CHUNK_SIZE: usize = 10 * 1024 * 1024; // 10 MB
-
 const STRING_CHARS: [u8; 74] =
     *b" $+,-./0123456789<=>?ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz";
 const MIN_STRING_LENGTH: usize = 5;
 const MAX_STRING_LENGTH: usize = 128;
-
-// TODO - use these!
-const MIN_SEQUENCE_LENGTH: usize = 1;
-const MAX_SEQUENCE_LENGTH: usize = 16;
+const MIN_BYTE_SEQUENCE_LENGTH: usize = 1;
+const MAX_BYTE_SEQUENCE_LENGTH: usize = 16;
 
 const VERBOSE: bool = false;
 
@@ -334,7 +333,9 @@ fn refine_common_byte_sequences_v2(
         // over the entire file, not the substring. This means we need
         // to add the overall index to the sub index!
         for (sub_index, seq) in subsequences {
-            final_sequences.insert(*index + sub_index, seq);
+            if seq.len() >= MIN_BYTE_SEQUENCE_LENGTH && seq.len() <= MAX_BYTE_SEQUENCE_LENGTH {
+                final_sequences.insert(*index + sub_index, seq);
+            }
         }
     }
 
@@ -351,16 +352,8 @@ fn common_string_identification_v2a(hashsets: &mut Vec<HashSet<String>>) -> Hash
         .unwrap_or(0);
     let mut common_strings_hashset = hashsets.swap_remove(smallest_hashset_index);
 
-    //println!("Original common strings hashset = {common_strings_hashset:?}");
-
-    //let total = hashsets.len();
-    //let mut i = 0;
-
     // Find the common strings between all of the hashsets.
     while !hashsets.is_empty() {
-        //println!("String processing iteration {} of {}", i, total);
-        //i += 1;
-
         // Take the topmost hashset, allowing memory to be freed as we go.
         let mut set = hashsets.remove(0);
 
@@ -417,26 +410,24 @@ fn common_string_identification_v2a(hashsets: &mut Vec<HashSet<String>>) -> Hash
     final_hashset
 }
 
-fn calculate_shannon_entropy(data: &[u8]) -> (f64, HashMap<u8, u8>) {
+fn calculate_shannon_entropy(data: &[u8]) -> (f64, HashMap<u8, u32>) {
     // Count the frequency of each bute in the input data.
-    let mut frequencies = HashMap::new();
-
-    // Count and classify the bytes.
+    let mut frequency = HashMap::new();
     for b in data {
-        *frequencies.entry(*b).or_insert(0) += 1;
+        *frequency.entry(*b).or_insert(0u32) += 1;
     }
 
     // Calculate the total range of bytes.
     let total_bytes = data.len() as f64;
 
-    // Compute the entropy
+    // Compute the entropy.
     let mut entropy = 0.0;
-    for &count in frequencies.values() {
+    for &count in frequency.values() {
         let probability = count as f64 / total_bytes;
         entropy -= probability * probability.log2();
     }
 
-    (entropy, frequencies)
+    (entropy, frequency)
 }
 
 fn all_substrings_over_min_size(string: &str) -> Vec<&str> {
