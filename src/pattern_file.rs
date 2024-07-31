@@ -12,8 +12,8 @@ impl Pattern {}
 pub struct PatternTypeData {
     pub name: String,
     pub description: String,
-    pub common_extensions: Vec<String>,
-    pub mimetype: String,
+    pub known_extensions: Vec<String>,
+    pub known_mimetypes: Vec<String>,
 }
 
 pub struct PatternData {
