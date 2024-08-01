@@ -5,7 +5,8 @@ use std::{
 };
 
 use rayon::prelude::*;
-use walkdir::WalkDir;
+
+use crate::utils;
 
 const FILE_CHUNK_SIZE: usize = 10 * 1024 * 1024; // 10 MB
 pub const STRING_CHARS: [u8; 74] =
@@ -15,30 +16,10 @@ const MAX_STRING_LENGTH: usize = 128;
 const MIN_BYTE_SEQUENCE_LENGTH: usize = 1;
 const MAX_BYTE_SEQUENCE_LENGTH: usize = 16;
 
-pub fn strip_invalid_length_sequences(sequences: &mut HashMap<usize, Vec<u8>>) {
+pub fn strip_sequences_by_length(sequences: &mut HashMap<usize, Vec<u8>>) {
     // Strip any sequences that don't meet the requirements.
     sequences
         .retain(|_, b| b.len() >= MIN_BYTE_SEQUENCE_LENGTH && b.len() <= MAX_BYTE_SEQUENCE_LENGTH);
-}
-
-pub fn list_files_of_type(dir: &str, target_ext: &str) -> Vec<String> {
-    let mut mkv_files = Vec::new();
-
-    for entry in WalkDir::new(dir)
-        .into_iter()
-        .filter_map(Result::ok)
-        .filter(|e| e.path().is_file())
-    {
-        if let Some(ext) = entry.path().extension() {
-            if ext == target_ext {
-                if let Some(path_str) = entry.path().to_str() {
-                    mkv_files.push(path_str.to_string());
-                }
-            }
-        }
-    }
-
-    mkv_files
 }
 
 pub fn print_byte_sequence_matches(sequences: &HashMap<usize, Vec<u8>>) {
@@ -57,7 +38,8 @@ pub fn test_matching_file_byte_sequences(
 ) -> bool {
     let mut all_success = true;
 
-    for file_path in &list_files_of_type(path, target_extension) {
+    let files = utils::list_files_of_type(path, target_extension);
+    for file_path in &files {
         // No sequences, we can skip the scan completely.
         if sequences.is_empty() {
             break;
@@ -87,11 +69,12 @@ pub fn test_matching_file_strings(
     path: &str,
     target_extension: &str,
     ref_chars: &HashSet<u8>,
-    common_strings: &HashSet<String>,
+    common_strings: &Vec<String>,
 ) -> bool {
     let mut all_success = true;
 
-    for file_path in &list_files_of_type(path, target_extension) {
+    let files = utils::list_files_of_type(path, target_extension);
+    for file_path in &files {
         // No strings, we can skip the scan completely.
         if common_strings.is_empty() {
             break;
@@ -191,7 +174,7 @@ pub fn refine_common_byte_sequences_v2(
     *common_byte_sequences = final_sequences;
 }
 
-pub fn common_string_identification_v2a(hashsets: &mut Vec<HashSet<String>>) -> HashSet<String> {
+pub fn common_string_sieve(hashsets: &mut Vec<HashSet<String>>) -> HashSet<String> {
     // Find the smallest set to minimize the search space.
     let smallest_hashset_index = hashsets
         .iter()
@@ -259,24 +242,24 @@ pub fn common_string_identification_v2a(hashsets: &mut Vec<HashSet<String>>) -> 
     final_hashset
 }
 
-pub fn calculate_shannon_entropy(data: &[u8]) -> (f64, HashMap<u8, u32>) {
-    // Count the frequency of each bute in the input data.
-    let mut frequency = HashMap::new();
+pub fn count_byte_frequencies(data: &[u8], frequencies: &mut HashMap<u8, usize>) {
     for b in data {
-        *frequency.entry(*b).or_insert(0u32) += 1;
+        *frequencies.entry(*b).or_insert(0) += 1;
     }
+}
 
+pub fn calculate_shannon_entropy(frequencies: &HashMap<u8, usize>) -> f64 {
     // Calculate the total range of bytes.
-    let total_bytes = data.len() as f64;
+    let total_bytes = frequencies.values().sum::<usize>() as f64;
 
     // Compute the entropy.
     let mut entropy = 0.0;
-    for &count in frequency.values() {
+    for &count in frequencies.values() {
         let probability = count as f64 / total_bytes;
         entropy -= probability * probability.log2();
     }
 
-    (entropy, frequency)
+    entropy
 }
 
 fn all_substrings_over_min_size(string: &str) -> Vec<&str> {

@@ -1,6 +1,10 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use chrono::{DateTime, Utc};
+
+use crate::{file_processor, utils};
+
+const VERBOSE: bool = false;
 
 #[derive(Default)]
 pub struct Pattern {
@@ -12,15 +16,15 @@ pub struct Pattern {
 
 impl Pattern {
     pub fn new(
-        name: String,
-        description: String,
+        name: &str,
+        description: &str,
         known_extensions: Vec<String>,
         known_mimetypes: Vec<String>,
     ) -> Self {
         Self {
             type_data: PatternTypeData {
-                name,
-                description,
+                name: name.to_string(),
+                description: description.to_string(),
                 known_extensions,
                 known_mimetypes,
             },
@@ -75,6 +79,76 @@ impl Pattern {
             refined_by,
             refined_by_email,
         };
+    }
+
+    pub fn build_patterns_from_data(
+        &mut self,
+        source_directory: &str,
+        target_extension: &str,
+        scan_strings: bool,
+        scan_bytes: bool,
+        scan_entropy: bool,
+    ) {
+        let ref_chars: HashSet<u8> = file_processor::STRING_CHARS.iter().copied().collect();
+
+        let mut first_byte_sequence_pass = true;
+
+        let mut common_byte_sequences = HashMap::new();
+        let mut all_strings = Vec::new();
+        let mut entropy = HashMap::new();
+
+        let files = utils::list_files_of_type(source_directory, target_extension);
+        for file_path in &files {
+            if VERBOSE {
+                println!("Analyzing candidate file - {file_path}");
+            }
+
+            // If we made it here then we have a valid file.
+            let chunk =
+                file_processor::read_file_header_chunk(file_path).expect("failed to read file");
+
+            if scan_entropy {
+                file_processor::count_byte_frequencies(&chunk, &mut entropy);
+            }
+
+            if scan_strings {
+                let string_hashset =
+                    file_processor::generate_file_string_hashset(&chunk, &ref_chars);
+                all_strings.push(string_hashset);
+            }
+
+            // On the first pass, we simply set the matching sequence as the entire byte block.
+            // This will get trimmed down and split into sections over future loop iterations.
+            if first_byte_sequence_pass {
+                common_byte_sequences.insert(0, chunk);
+                first_byte_sequence_pass = false;
+                continue;
+            }
+
+            if scan_bytes {
+                file_processor::refine_common_byte_sequences_v2(&chunk, &mut common_byte_sequences);
+            }
+        }
+
+        // Sieve the strings to retain only the common ones.
+        file_processor::strip_sequences_by_length(&mut common_byte_sequences);
+        let common_strings = file_processor::common_string_sieve(&mut all_strings);
+
+        // Compute the new average file entropy.
+        let merged_entropy_bytes =
+            utils::merge_hashmaps(vec![&self.other_data.entropy_bytes, &entropy]);
+
+        // Add the computed information into the struct.
+        self.data.scan_strings = scan_strings;
+        self.data.string_patterns = Vec::from_iter(common_strings);
+        self.data.scan_byte_sequences = scan_bytes;
+        self.data.byte_sequences = common_byte_sequences;
+        self.data.scan_entropy = scan_entropy;
+        self.data.average_entropy =
+            file_processor::calculate_shannon_entropy(&merged_entropy_bytes);
+
+        self.other_data.total_scanned_files += files.len();
+        self.other_data.entropy_bytes = merged_entropy_bytes;
     }
 }
 
