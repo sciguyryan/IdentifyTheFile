@@ -6,8 +6,6 @@ pub mod utils;
 use file_point_calculator::FilePointCalculator;
 use pattern_file::Pattern;
 
-// TODO - add some basic tests.
-
 fn main() {
     let splitter = "-".repeat(54);
     let half_splitter = "-".repeat(27);

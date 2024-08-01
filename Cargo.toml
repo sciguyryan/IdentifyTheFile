@@ -17,3 +17,12 @@ serde_derive = "1.0.204"
 serde_json = "1.0.121"
 uuid = { version = "1.10.0", features = ["serde", "v7"] }
 walkdir = "2.5.0"
+
+[profile.dev]
+opt-level = 0
+
+[profile.release]
+opt-level = 3
+lto = true
+strip = true
+#panic = "abort"

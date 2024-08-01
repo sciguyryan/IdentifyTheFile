@@ -129,8 +129,9 @@ impl Pattern {
             }
         }
 
-        // Sieve the strings to retain only the common ones.
         file_processor::strip_sequences_by_length(&mut common_byte_sequences);
+
+        // Sieve the strings to retain only the common ones.
         let common_strings = file_processor::common_string_sieve(&mut all_strings);
 
         // Compute the new average file entropy.
@@ -209,4 +210,136 @@ pub struct PatternSubmitterData {
     pub submitted_on: DateTime<Utc>,
     pub refined_by: Vec<String>,
     pub refined_by_email: Vec<String>,
+}
+
+#[cfg(test)]
+mod tests_pattern {
+    use core::str;
+    use std::path::Path;
+
+    use crate::file_processor::ASCII_READABLE_CHARACTERS;
+
+    use super::Pattern;
+
+    #[test]
+    fn test_string_identification_1() {
+        // Basic match, two files both completely matching.
+        let pattern = build_test("strings", "1");
+
+        assert_ordered_vec_eq(
+            pattern.data.string_patterns,
+            vec!["ABCDEFGHIJK".to_string()],
+        );
+    }
+
+    #[test]
+    fn test_string_identification_2() {
+        // Simple non-match, two files and none are matching.
+        let pattern = build_test("strings", "2");
+
+        assert_ordered_vec_eq(
+            pattern.data.string_patterns,
+            Vec::<String>::with_capacity(0),
+        );
+    }
+
+    #[test]
+    fn test_string_identification_3() {
+        // Simple match, but only a substring is matching.
+        let pattern = build_test("strings", "3");
+
+        assert_ordered_vec_eq(pattern.data.string_patterns, vec!["ABCDE".to_string()]);
+    }
+
+    #[test]
+    fn test_string_identification_4() {
+        // Split match, two substrings will be returned. Delimiter formed by a "non-string" character.
+        let pattern = build_test("strings", "4");
+
+        assert_ordered_vec_eq(
+            pattern.data.string_patterns,
+            vec!["ABCDE".to_string(), "GHIJK".to_string()],
+        );
+    }
+
+    #[test]
+    fn test_string_identification_5() {
+        // Split match, one substrings will be returned.
+        let pattern = build_test("strings", "5");
+
+        assert_ordered_vec_eq(pattern.data.string_patterns, vec!["GHIJK".to_string()]);
+    }
+
+    #[test]
+    fn test_string_identification_6() {
+        // Split match, two substrings will be returned, one will be skipped due to length requirements.
+        let pattern = build_test("strings", "6");
+
+        assert_ordered_vec_eq(
+            pattern.data.string_patterns,
+            vec!["ABCDEFGHIJK".to_string(), "123456".to_string()],
+        );
+    }
+
+    #[test]
+    fn test_string_identification_7() {
+        // Split match, one substring will be returned, one will be skipped due to length requirements.
+        let pattern = build_test("strings", "7");
+
+        assert_ordered_vec_eq(pattern.data.string_patterns, vec!["123456".to_string()]);
+    }
+
+    #[test]
+    fn test_string_identification_8() {
+        // Testing that all of the safe string characters are returned in a string.
+        let pattern = build_test("strings", "8");
+
+        // Build our test string. We need to make sure that character are converted to upper
+        // case since that is what the pattern engine will use.
+        let mut vec = Vec::new();
+        for b in ASCII_READABLE_CHARACTERS.iter() {
+            vec.push((*b as char).to_ascii_uppercase());
+        }
+
+        let str = String::from_iter(&vec);
+
+        assert_ordered_vec_eq(pattern.data.string_patterns, vec![str]);
+    }
+
+    fn test_path_builder(test_type: &str, test_id: &str) -> String {
+        let test_dir = std::fs::canonicalize(format!("./tests/{test_type}/{test_id}"))
+            .expect("failed to find test directory");
+        let resolved_dir = test_dir.to_string_lossy().to_string();
+
+        if !Path::new(&resolved_dir).exists() {
+            panic!("failed to find test directory at '{resolved_dir}'");
+        }
+
+        resolved_dir
+    }
+
+    fn build_test(test_type: &str, test_id: &str) -> Pattern {
+        // Split match, two substrings will be returned. Delimiter formed by a "non-string" character.
+        let test_dir = test_path_builder(test_type, test_id);
+
+        let mut pattern = Pattern::new(
+            "test",
+            "test",
+            vec!["test".to_string()],
+            vec!["text/plain".to_string()],
+        );
+        pattern.build_patterns_from_data(&test_dir, "test", true, false, false);
+
+        pattern
+    }
+
+    fn assert_ordered_vec_eq(vec_1: Vec<String>, vec_2: Vec<String>) {
+        let mut ordered_vec_1 = vec_1;
+        ordered_vec_1.sort();
+
+        let mut ordered_vec_2 = vec_2;
+        ordered_vec_2.sort();
+
+        assert_eq!(ordered_vec_1, ordered_vec_2);
+    }
 }

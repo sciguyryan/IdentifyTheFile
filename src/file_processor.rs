@@ -7,10 +7,11 @@ use std::{
 };
 
 lazy_static! {
-    pub static ref REF_CHARS: HashSet<u8> = {
-        let chars = b" $+,-./0123456789<=>?ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz";
-        chars.iter().copied().collect()
+    pub static ref ASCII_READABLE_CHARACTERS: Vec<u8> = {
+        b" !#$+,-./0123456789<=>?ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz".to_vec()
     };
+    pub static ref ASCII_READABLE_CHARACTERS_SET: HashSet<u8> =
+        ASCII_READABLE_CHARACTERS.iter().copied().collect();
 }
 
 /// The size of a file chunk to read. Larger is more accurate but slower.
@@ -24,12 +25,6 @@ const MAX_STRING_LENGTH: usize = 128;
 const MIN_BYTE_SEQUENCE_LENGTH: usize = 1;
 /// The maximum length of a byte sequence.
 const MAX_BYTE_SEQUENCE_LENGTH: usize = 16;
-
-pub fn strip_sequences_by_length(sequences: &mut HashMap<usize, Vec<u8>>) {
-    // Strip any sequences that don't meet the requirements.
-    sequences
-        .retain(|_, b| b.len() >= MIN_BYTE_SEQUENCE_LENGTH && b.len() <= MAX_BYTE_SEQUENCE_LENGTH);
-}
 
 fn all_substrings_over_min_size(string: &str) -> Vec<&str> {
     let mut substrings = Vec::new();
@@ -58,14 +53,14 @@ pub fn calculate_shannon_entropy(frequencies: &HashMap<u8, usize>) -> f64 {
 }
 
 pub fn common_string_sieve(hashsets: &mut Vec<HashSet<String>>) -> HashSet<String> {
-    // Find the smallest set to minimize the search space.
-    let smallest_hashset_index = hashsets
+    // Find largest set to maximise the matching potential.
+    let largest_hashset_index = hashsets
         .iter()
         .enumerate()
-        .min_by_key(|(_, set)| set.len())
+        .max_by_key(|(_, set)| set.len())
         .map(|(index, _)| index)
         .unwrap_or(0);
-    let mut common_strings_hashset = hashsets.swap_remove(smallest_hashset_index);
+    let mut common_strings_hashset = hashsets.swap_remove(largest_hashset_index);
 
     // Find the common strings between all of the hashsets.
     while !hashsets.is_empty() {
@@ -176,7 +171,7 @@ pub fn generate_file_string_hashset(bytes: &[u8]) -> HashSet<String> {
     let mut string_buffer = String::with_capacity(MAX_STRING_LENGTH);
     for (i, byte) in bytes.iter().enumerate() {
         // At the first non-valid string byte, we consider the string terminated.
-        if !REF_CHARS.contains(byte) {
+        if !ASCII_READABLE_CHARACTERS.contains(byte) {
             push_string = true;
         } else {
             // Push the character onto the buffer.
@@ -256,4 +251,10 @@ pub fn refine_common_byte_sequences_v2(
     }
 
     *common_byte_sequences = final_sequences;
+}
+
+pub fn strip_sequences_by_length(sequences: &mut HashMap<usize, Vec<u8>>) {
+    // Strip any sequences that don't meet the requirements.
+    sequences
+        .retain(|_, b| b.len() >= MIN_BYTE_SEQUENCE_LENGTH && b.len() <= MAX_BYTE_SEQUENCE_LENGTH);
 }
