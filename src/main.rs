@@ -2,8 +2,6 @@ pub mod file_processor;
 pub mod pattern_file;
 pub mod utils;
 
-use std::collections::HashSet;
-
 use pattern_file::Pattern;
 
 const VERBOSE: bool = false;
@@ -40,13 +38,10 @@ fn main() {
     println!("Common strings = {:?}", pattern.data.string_patterns);
     println!("{splitter}");
 
-    let ref_chars: HashSet<u8> = file_processor::STRING_CHARS.iter().copied().collect();
-
     println!("Testing common string matches...");
     if file_processor::test_matching_file_strings(
         file_dir,
         target_extension,
-        &ref_chars,
         &pattern.data.string_patterns,
     ) {
         println!("\x1b[92mSuccessfully matched all applicable strings!\x1b[0m");

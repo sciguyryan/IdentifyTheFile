@@ -68,10 +68,11 @@ pub fn test_matching_file_byte_sequences(
 pub fn test_matching_file_strings(
     path: &str,
     target_extension: &str,
-    ref_chars: &HashSet<u8>,
     common_strings: &Vec<String>,
 ) -> bool {
     let mut all_success = true;
+
+    let ref_chars: HashSet<u8> = STRING_CHARS.iter().copied().collect();
 
     let files = utils::list_files_of_type(path, target_extension);
     for file_path in &files {
@@ -81,7 +82,7 @@ pub fn test_matching_file_strings(
         }
 
         let chunk = read_file_header_chunk(file_path).expect("failed to read file");
-        let strings = generate_file_string_hashset(&chunk, ref_chars);
+        let strings = generate_file_string_hashset(&chunk, &ref_chars);
 
         let mut matches = 0;
         for el in common_strings {

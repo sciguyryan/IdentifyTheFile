@@ -1,12 +1,14 @@
 use std::collections::{HashMap, HashSet};
 
 use chrono::{DateTime, Utc};
+use serde_derive::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use crate::{file_processor, utils};
 
 const VERBOSE: bool = false;
 
-#[derive(Default)]
+#[derive(Default, Debug, Serialize, Deserialize)]
 pub struct Pattern {
     pub type_data: PatternTypeData,
     pub data: PatternData,
@@ -27,6 +29,7 @@ impl Pattern {
                 description: description.to_string(),
                 known_extensions,
                 known_mimetypes,
+                uuid: Uuid::now_v7(),
             },
             data: PatternData::default(),
             other_data: PatternOtherData::default(),
@@ -152,7 +155,7 @@ impl Pattern {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug, Serialize, Deserialize)]
 pub struct PatternTypeData {
     /// The name of this file type.
     pub name: String,
@@ -162,9 +165,11 @@ pub struct PatternTypeData {
     pub known_extensions: Vec<String>,
     /// Any known mimetypes for this file type.
     pub known_mimetypes: Vec<String>,
+    /// The UUID of the pattern file.
+    pub uuid: Uuid,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug, Serialize, Deserialize)]
 pub struct PatternData {
     /// Should we scan for strings in this file type?
     pub scan_strings: bool,
@@ -183,7 +188,7 @@ pub struct PatternData {
     pub average_entropy: f64,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug, Serialize, Deserialize)]
 pub struct PatternOtherData {
     /// The total number of files that have been scanned to build this pattern.
     /// Refinements to the pattern will add to this total.
@@ -192,7 +197,7 @@ pub struct PatternOtherData {
     pub entropy_bytes: HashMap<u8, usize>,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug, Serialize, Deserialize)]
 pub struct PatternSubmitterData {
     pub scanned_by: String,
     pub scanned_by_email: String,
