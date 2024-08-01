@@ -1,10 +1,12 @@
+pub mod file_point_calculator;
 pub mod file_processor;
 pub mod pattern_file;
 pub mod utils;
 
+use file_point_calculator::FilePointCalculator;
 use pattern_file::Pattern;
 
-const VERBOSE: bool = false;
+// TODO - add some basic tests.
 
 fn main() {
     let splitter = "-".repeat(54);
@@ -28,7 +30,7 @@ fn main() {
 
     println!("{splitter}");
     println!("Matching positional byte sequences");
-    file_processor::print_byte_sequence_matches(&pattern.data.byte_sequences);
+    utils::print_byte_sequence_matches(&pattern.data.byte_sequences);
 
     if pattern.data.string_patterns.is_empty() {
         println!("No common strings were found!");
@@ -38,25 +40,31 @@ fn main() {
     println!("Common strings = {:?}", pattern.data.string_patterns);
     println!("{splitter}");
 
-    println!("Testing common string matches...");
-    if file_processor::test_matching_file_strings(
-        file_dir,
-        target_extension,
-        &pattern.data.string_patterns,
-    ) {
-        println!("\x1b[92mSuccessfully matched all applicable strings!\x1b[0m");
-    } else {
-        println!("\x1b[91mFailed to match one or more strings!\x1b[0m");
+    // Test files here.
+    let mut all_strings_match = true;
+    let mut all_bytes_match = true;
+    let files = utils::list_files_of_type(file_dir, target_extension);
+    for file in &files {
+        println!("File = {file}");
+        let chunk = file_processor::read_file_header_chunk(file).expect("failed to read file");
+
+        let mut calc = FilePointCalculator::new();
+        all_bytes_match &= calc.test_byte_sequence(&chunk, &pattern);
+        all_strings_match &= calc.test_file_strings(&chunk, &pattern);
+        calc.test_entropy_deviation(&chunk, &pattern);
+
+        println!("Total points = {}", calc.points);
     }
 
-    println!("Testing common byte sequence matches...");
-    if file_processor::test_matching_file_byte_sequences(
-        file_dir,
-        target_extension,
-        &pattern.data.byte_sequences,
-    ) {
+    if all_bytes_match {
         println!("\x1b[92mSuccessfully matched all applicable byte sequences!\x1b[0m");
     } else {
         println!("\x1b[91mFailed to match one or more byte sequences!\x1b[0m");
+    }
+
+    if all_strings_match {
+        println!("\x1b[92mSuccessfully matched all applicable strings!\x1b[0m");
+    } else {
+        println!("\x1b[91mFailed to match one or more strings!\x1b[0m");
     }
 }

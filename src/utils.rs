@@ -35,3 +35,12 @@ pub fn merge_hashmaps(maps: Vec<&HashMap<u8, usize>>) -> HashMap<u8, usize> {
 
     result
 }
+
+pub fn print_byte_sequence_matches(sequences: &HashMap<usize, Vec<u8>>) {
+    let mut vec: Vec<(usize, Vec<u8>)> = sequences
+        .iter()
+        .map(|(index, m)| (*index, m.clone()))
+        .collect();
+    vec.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+    println!("{vec:?}");
+}

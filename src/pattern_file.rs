@@ -1,14 +1,13 @@
-use std::collections::{HashMap, HashSet};
-
 use chrono::{DateTime, Utc};
 use serde_derive::{Deserialize, Serialize};
+use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::{file_processor, utils};
 
 const VERBOSE: bool = false;
 
-#[derive(Default, Debug, Serialize, Deserialize)]
+#[derive(Clone, Default, Debug, Serialize, Deserialize)]
 pub struct Pattern {
     pub type_data: PatternTypeData,
     pub data: PatternData,
@@ -92,8 +91,6 @@ impl Pattern {
         scan_bytes: bool,
         scan_entropy: bool,
     ) {
-        let ref_chars: HashSet<u8> = file_processor::STRING_CHARS.iter().copied().collect();
-
         let mut first_byte_sequence_pass = true;
 
         let mut common_byte_sequences = HashMap::new();
@@ -115,8 +112,7 @@ impl Pattern {
             }
 
             if scan_strings {
-                let string_hashset =
-                    file_processor::generate_file_string_hashset(&chunk, &ref_chars);
+                let string_hashset = file_processor::generate_file_string_hashset(&chunk);
                 all_strings.push(string_hashset);
             }
 
@@ -155,7 +151,7 @@ impl Pattern {
     }
 }
 
-#[derive(Default, Debug, Serialize, Deserialize)]
+#[derive(Clone, Default, Debug, Serialize, Deserialize)]
 pub struct PatternTypeData {
     /// The name of this file type.
     pub name: String,
@@ -169,26 +165,35 @@ pub struct PatternTypeData {
     pub uuid: Uuid,
 }
 
-#[derive(Default, Debug, Serialize, Deserialize)]
+#[derive(Clone, Default, Debug, Serialize, Deserialize)]
 pub struct PatternData {
     /// Should we scan for strings in this file type?
     pub scan_strings: bool,
     /// Any strings that may be associated with this file type.
     /// This field will be empty if string scanning is disabled.
+    ///
+    /// # Notes
+    /// String matches are optional and a missing string will not render the match void.
     pub string_patterns: Vec<String>,
     /// Should we scan for byte sequences?
     pub scan_byte_sequences: bool,
     /// Any positional byte sequences that may be associated with this file type.
     /// This field will be empty if byte sequence scanning is disabled.
+    ///
+    /// # Notes
+    /// Byte sequence matches are not optional - a missing sequence will result in a no-match.
     pub byte_sequences: HashMap<usize, Vec<u8>>,
     /// Should we scan the file's entropy?
     pub scan_entropy: bool,
     /// The average entropy for this file type.
     /// This will be zero if entropy scanning is disabled.
+    ///
+    /// # Notes
+    /// Entropy will be evaluated based by its percentage of deviation from the stored average.
     pub average_entropy: f64,
 }
 
-#[derive(Default, Debug, Serialize, Deserialize)]
+#[derive(Clone, Default, Debug, Serialize, Deserialize)]
 pub struct PatternOtherData {
     /// The total number of files that have been scanned to build this pattern.
     /// Refinements to the pattern will add to this total.
@@ -197,7 +202,7 @@ pub struct PatternOtherData {
     pub entropy_bytes: HashMap<u8, usize>,
 }
 
-#[derive(Default, Debug, Serialize, Deserialize)]
+#[derive(Clone, Default, Debug, Serialize, Deserialize)]
 pub struct PatternSubmitterData {
     pub scanned_by: String,
     pub scanned_by_email: String,
