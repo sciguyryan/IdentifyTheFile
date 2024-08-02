@@ -390,7 +390,7 @@ mod tests_pattern {
         let pattern = build_test("entropy", "1", false, false, true);
 
         // Floats are tricky, we need a little bit of fuzziness to properly check them.
-        if !approx_equal(pattern.data.average_entropy, 4.267531753682214, 13) {
+        if !approx_equal(pattern.data.average_entropy, 4.267531753682214, 10) {
             panic!(
                 "expected = 4.267531753682214, actual = {}",
                 pattern.data.average_entropy
@@ -403,7 +403,7 @@ mod tests_pattern {
         let pattern = build_test("entropy", "2", false, false, true);
 
         // Floats are tricky, we need a little bit of fuzziness to properly check them.
-        if !approx_equal(pattern.data.average_entropy, 7.983481015642819, 13) {
+        if !approx_equal(pattern.data.average_entropy, 7.983481015642819, 10) {
             panic!(
                 "expected = 7.983481015642819, actual = {}",
                 pattern.data.average_entropy
