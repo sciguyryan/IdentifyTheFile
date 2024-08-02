@@ -44,3 +44,8 @@ pub fn print_byte_sequence_matches(sequences: &HashMap<usize, Vec<u8>>) {
     vec.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
     println!("{vec:?}");
 }
+
+pub fn round_to_dp(value: f64, decimal_places: usize) -> f64 {
+    let multiplier = 10f64.powi(decimal_places as i32);
+    (value * multiplier).round() / multiplier
+}

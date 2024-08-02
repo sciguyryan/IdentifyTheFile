@@ -23,7 +23,7 @@ fn main() {
         pattern.other_data.total_scanned_files
     );
     println!("{splitter}");
-    println!("Average Entropy = {}", pattern.data.average_entropy);
+    println!("Average Entropy = {}", pattern.data.get_entropy());
     println!("{half_splitter}");
 
     println!("{splitter}");

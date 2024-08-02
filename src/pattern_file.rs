@@ -196,7 +196,13 @@ pub struct PatternData {
     ///
     /// # Notes
     /// Entropy will be evaluated based by its percentage of deviation from the stored average.
-    pub average_entropy: f64,
+    average_entropy: f64,
+}
+
+impl PatternData {
+    pub fn get_entropy(&self) -> f64 {
+        utils::round_to_dp(self.average_entropy, 3)
+    }
 }
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
@@ -222,7 +228,7 @@ mod tests_pattern {
     use core::str;
     use std::{collections::HashMap, path::Path};
 
-    use crate::file_processor::ASCII_CHARACTER_STRING;
+    use crate::{file_processor::ASCII_CHARACTER_STRING, utils};
 
     use super::Pattern;
 
@@ -390,10 +396,10 @@ mod tests_pattern {
         let pattern = build_test("entropy", "1", false, false, true);
 
         // Floats are tricky, we need a little bit of fuzziness to properly check them.
-        if !approx_equal(pattern.data.average_entropy, 4.267531753682214, 1) {
+        if !approx_equal(pattern.data.average_entropy, 4.3, 1) {
             panic!(
-                "expected = 4.267531753682214, actual = {}",
-                pattern.data.average_entropy
+                "expected = 4.3, actual = {}",
+                utils::round_to_dp(pattern.data.average_entropy, 1)
             );
         }
     }
@@ -403,10 +409,10 @@ mod tests_pattern {
         let pattern = build_test("entropy", "2", false, false, true);
 
         // Floats are tricky, we need a little bit of fuzziness to properly check them.
-        if !approx_equal(pattern.data.average_entropy, 7.983481015642819, 1) {
+        if !approx_equal(pattern.data.average_entropy, 8.0, 1) {
             panic!(
-                "expected = 7.983481015642819, actual = {}",
-                pattern.data.average_entropy
+                "expected = 8.0, actual = {}",
+                utils::round_to_dp(pattern.data.average_entropy, 1)
             );
         }
     }
@@ -421,9 +427,8 @@ mod tests_pattern {
         }
     }
 
-    fn approx_equal(a: f64, b: f64, decimal_places: u8) -> bool {
-        let factor = 10.0f64.powi(decimal_places as i32);
-        (a * factor).trunc() == (b * factor).trunc()
+    fn approx_equal(a: f64, b: f64, decimal_places: usize) -> bool {
+        utils::round_to_dp(a, decimal_places) == utils::round_to_dp(b, decimal_places)
     }
 
     fn test_path_builder(test_type: &str, test_id: &str) -> String {
