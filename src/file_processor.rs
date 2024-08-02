@@ -6,13 +6,13 @@ use std::{
     sync::OnceLock,
 };
 
+pub const ASCII_CHARACTER_STRING: &str =
+    " !#$+,-./0123456789<=>?ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz";
 pub static ASCII_READABLE_CHARACTERS: OnceLock<Vec<u8>> = OnceLock::new();
 pub static ASCII_READABLE_CHARACTERS_SET: OnceLock<HashSet<u8>> = OnceLock::new();
 
 pub fn get_ascii_readable_characters() -> &'static Vec<u8> {
-    ASCII_READABLE_CHARACTERS.get_or_init(|| {
-        b" !#$+,-./0123456789<=>?ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz".to_vec()
-    })
+    ASCII_READABLE_CHARACTERS.get_or_init(|| ASCII_CHARACTER_STRING.as_bytes().to_vec())
 }
 
 pub fn get_ascii_readable_characters_set() -> &'static HashSet<u8> {

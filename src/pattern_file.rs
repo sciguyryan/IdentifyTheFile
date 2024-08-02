@@ -222,7 +222,7 @@ mod tests_pattern {
     use core::str;
     use std::{collections::HashMap, path::Path};
 
-    use crate::file_processor::get_ascii_readable_characters_set;
+    use crate::file_processor::{get_ascii_readable_characters_set, ASCII_CHARACTER_STRING};
 
     use super::Pattern;
 
@@ -299,8 +299,8 @@ mod tests_pattern {
         // Build our test string. We need to make sure that character are converted to upper
         // case since that is what the pattern engine will use.
         let mut vec = Vec::new();
-        for b in get_ascii_readable_characters_set().iter() {
-            vec.push((*b as char).to_ascii_uppercase());
+        for c in ASCII_CHARACTER_STRING.chars() {
+            vec.push(c.to_ascii_uppercase());
         }
 
         let str = String::from_iter(&vec);
