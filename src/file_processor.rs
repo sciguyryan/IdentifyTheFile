@@ -1,17 +1,23 @@
-use lazy_static::lazy_static;
 use rayon::prelude::*;
 use std::{
     collections::{HashMap, HashSet},
     fs::File,
     io::{self, BufReader, Read},
+    sync::OnceLock,
 };
 
-lazy_static! {
-    pub static ref ASCII_READABLE_CHARACTERS: Vec<u8> = {
+pub static ASCII_READABLE_CHARACTERS: OnceLock<Vec<u8>> = OnceLock::new();
+pub static ASCII_READABLE_CHARACTERS_SET: OnceLock<HashSet<u8>> = OnceLock::new();
+
+pub fn get_ascii_readable_characters() -> &'static Vec<u8> {
+    ASCII_READABLE_CHARACTERS.get_or_init(|| {
         b" !#$+,-./0123456789<=>?ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz".to_vec()
-    };
-    pub static ref ASCII_READABLE_CHARACTERS_SET: HashSet<u8> =
-        ASCII_READABLE_CHARACTERS.iter().copied().collect();
+    })
+}
+
+pub fn get_ascii_readable_characters_set() -> &'static HashSet<u8> {
+    ASCII_READABLE_CHARACTERS_SET
+        .get_or_init(|| get_ascii_readable_characters().iter().copied().collect())
 }
 
 /// The size of a file chunk to read. Larger is more accurate but slower.
@@ -188,7 +194,7 @@ pub fn generate_file_string_hashset(bytes: &[u8]) -> HashSet<String> {
     let mut string_buffer = String::with_capacity(MAX_STRING_LENGTH);
     for (i, byte) in bytes.iter().enumerate() {
         // At the first non-valid string byte, we consider the string terminated.
-        if !ASCII_READABLE_CHARACTERS.contains(byte) {
+        if !get_ascii_readable_characters_set().contains(byte) {
             push_string = true;
         } else {
             // Push the character onto the buffer.
