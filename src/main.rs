@@ -20,6 +20,9 @@ fn main() {
     pattern.build_patterns_from_data(file_dir, target_extension, true, true, true);
 
     println!("{splitter}");
+    let json = serde_json::to_string(&pattern).expect("");
+    println!("{json}");
+    println!("{splitter}");
     println!(
         "Valid sample files scanned: {}",
         pattern.other_data.total_scanned_files

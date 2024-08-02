@@ -5,7 +5,7 @@ use walkdir::WalkDir;
 pub fn get_file_extension(path: &str) -> String {
     // Get the file extension, if it exists.
     if let Some(extension) = Path::new(path).extension() {
-        extension.to_string_lossy().to_string()
+        extension.to_string_lossy().to_uppercase()
     } else {
         "".to_string()
     }
