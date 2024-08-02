@@ -1,72 +1,97 @@
 use std::collections::HashMap;
 
-use crate::{file_processor, pattern_file::Pattern, utils};
+use crate::{file_processor, pattern::Pattern, utils};
 
-const MAX_ENTROPY_POINTS: f64 = 50.0;
-const MAX_DEVIATION_PERCENT: f64 = 100.0;
+/// The maximum number of points to be awarded for entropy matching.
+pub const MAX_ENTROPY_POINTS: f64 = 25.0;
+/// The minimum percentage deviation to be used in the entropy points calculation.
 const MIN_DEVIATION_PERCENT: f64 = 1.0;
+/// The maximum percentage deviation to be used in the entropy points calculation.
+const MAX_DEVIATION_PERCENT: f64 = 100.0;
+/// The amount by which the total file count will be scaled to create the confidence factor.
+pub const CONFIDENCE_SCALE_FACTOR: f64 = 1.0 / 3.0;
+/// The number of points to be awarded for a file extension match.
+pub const FILE_EXTENSION_POINTS: f64 = 5.0;
 
 #[derive(Default)]
-pub struct FilePointCalculator {
-    pub points: usize,
-}
+pub struct FilePointCalculator {}
 
 impl FilePointCalculator {
-    pub fn new() -> Self {
-        Self::default()
-    }
+    pub fn compute(pattern: &Pattern, path: &str) -> usize {
+        let chunk = file_processor::read_file_header_chunk(path).expect("failed to read file");
 
-    pub fn test_byte_sequence(&mut self, bytes: &[u8], pattern: &Pattern) -> bool {
-        if !pattern.data.scan_byte_sequences || pattern.data.byte_sequences.is_empty() {
-            return true;
+        let mut points = 0.0;
+
+        if pattern.data.scan_byte_sequences {
+            points += FilePointCalculator::test_byte_sequence(pattern, &chunk);
+
+            // Byte sequence matches, if specified, MUST exist for a match to be valid at all.
+            // If the points returned are zero, the file cannot be a match.
+            // These should be tested before the strings and entropy.
+            if points == 0.0 {
+                return 0;
+            }
         }
 
-        let mut points = 0;
-        let mut is_match = true;
+        if pattern.data.scan_strings {
+            points += FilePointCalculator::test_file_strings(pattern, &chunk);
+        }
+
+        if pattern.data.scan_entropy {
+            points += FilePointCalculator::test_entropy_deviation(pattern, &chunk);
+        }
+
+        points += FilePointCalculator::test_file_extension(pattern, path);
+
+        let confidence_factor = FilePointCalculator::get_confidence_factor(pattern);
+
+        (points * confidence_factor).round() as usize
+    }
+
+    pub fn get_confidence_factor(pattern: &Pattern) -> f64 {
+        (pattern.other_data.total_scanned_files as f64).powf(CONFIDENCE_SCALE_FACTOR)
+    }
+
+    pub fn test_byte_sequence(pattern: &Pattern, bytes: &[u8]) -> f64 {
+        if !pattern.data.scan_byte_sequences || pattern.data.byte_sequences.is_empty() {
+            return 0.0;
+        }
+
+        let mut points = 0.0;
         for (start, sequence) in &pattern.data.byte_sequences {
             let end = *start + sequence.len();
             if *start > bytes.len() || end > bytes.len() {
-                is_match = false;
                 break;
             }
 
             if sequence != &bytes[*start..end] {
-                is_match = false;
                 break;
             } else {
-                points += sequence.len();
+                points += sequence.len() as f64;
             }
         }
 
-        if is_match {
-            self.points += points;
-        }
-
-        is_match
+        points
     }
 
-    pub fn test_file_strings(&mut self, bytes: &[u8], pattern: &Pattern) -> bool {
+    pub fn test_file_strings(pattern: &Pattern, bytes: &[u8]) -> f64 {
         if !pattern.data.scan_strings || pattern.data.string_patterns.is_empty() {
-            return true;
+            return 0.0;
         }
 
         let strings = file_processor::generate_file_string_hashset(bytes);
 
-        let mut points = 0;
-        let mut matches = 0;
+        let mut points = 0.0;
         for str in &pattern.data.string_patterns {
             if strings.contains(str) {
-                points += str.len();
-                matches += 1;
+                points += str.len() as f64;
             }
         }
 
-        self.points += points;
-
-        matches == pattern.data.string_patterns.len()
+        points
     }
 
-    pub fn test_entropy_deviation(&mut self, bytes: &[u8], pattern: &Pattern) -> f64 {
+    pub fn test_entropy_deviation(pattern: &Pattern, bytes: &[u8]) -> f64 {
         let reference_entropy = pattern.data.get_entropy();
         if !pattern.data.scan_entropy || reference_entropy == 0.0 {
             return MAX_ENTROPY_POINTS;
@@ -93,19 +118,23 @@ impl FilePointCalculator {
         }
 
         if deviation_percentage <= MIN_DEVIATION_PERCENT {
-            // If deviation is less than the minimum, award the maximum points.
-            self.points += MAX_ENTROPY_POINTS as usize;
-
             return MAX_ENTROPY_POINTS;
         }
 
-        // Calculate the score linearly between 0 and 150.
-        let score = MAX_ENTROPY_POINTS
+        // Calculate the score linearly between 0 and MAX_ENTROPY_POINTS.
+        MAX_ENTROPY_POINTS
             * (1.0
                 - (deviation_percentage - MIN_DEVIATION_PERCENT)
-                    / (MAX_DEVIATION_PERCENT - MIN_DEVIATION_PERCENT));
-        self.points += score as usize;
+                    / (MAX_DEVIATION_PERCENT - MIN_DEVIATION_PERCENT))
+    }
 
-        MAX_ENTROPY_POINTS
+    pub fn test_file_extension(pattern: &Pattern, path: &str) -> f64 {
+        let ext = utils::get_file_extension(path);
+
+        if pattern.type_data.known_extensions.contains(&ext) {
+            FILE_EXTENSION_POINTS
+        } else {
+            0.0
+        }
     }
 }

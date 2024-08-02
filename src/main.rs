@@ -1,10 +1,12 @@
 pub mod file_point_calculator;
 pub mod file_processor;
-pub mod pattern_file;
+pub mod pattern;
 pub mod utils;
 
 use file_point_calculator::FilePointCalculator;
-use pattern_file::Pattern;
+use pattern::Pattern;
+
+const VERBOSE: bool = false;
 
 fn main() {
     let splitter = "-".repeat(54);
@@ -14,7 +16,7 @@ fn main() {
     //let file_dir = "D:\\Downloads\\YouTube";
     let target_extension = "mkv";
 
-    let mut pattern = Pattern::new("test", "test", vec![], vec![]);
+    let mut pattern = Pattern::new("test", "test", vec!["mkv".to_string()], vec![]);
     pattern.build_patterns_from_data(file_dir, target_extension, true, true, true);
 
     println!("{splitter}");
@@ -24,18 +26,21 @@ fn main() {
     );
     println!("{splitter}");
     println!("Average Entropy = {}", pattern.data.get_entropy());
-    println!("{half_splitter}");
-
     println!("{splitter}");
-    println!("Matching positional byte sequences");
-    utils::print_byte_sequence_matches(&pattern.data.byte_sequences);
-
-    if pattern.data.string_patterns.is_empty() {
-        println!("No common strings were found!");
+    if pattern.data.byte_sequences.is_empty() {
+        println!("No common byte sequences were found!");
+    } else {
+        println!("Matching positional byte sequences...");
+        utils::print_byte_sequence_matches(&pattern.data.byte_sequences);
     }
 
     println!("{splitter}");
-    println!("Common strings = {:?}", pattern.data.string_patterns);
+    if pattern.data.string_patterns.is_empty() {
+        println!("No common strings were found!");
+    } else {
+        println!("Common strings...");
+        println!("{:?}", pattern.data.string_patterns);
+    }
     println!("{splitter}");
 
     // Test files here.
@@ -44,14 +49,53 @@ fn main() {
     let files = utils::list_files_of_type(file_dir, target_extension);
     for file in &files {
         println!("File = {file}");
+
         let chunk = file_processor::read_file_header_chunk(file).expect("failed to read file");
 
-        let mut calc = FilePointCalculator::new();
-        all_bytes_match &= calc.test_byte_sequence(&chunk, &pattern);
-        all_strings_match &= calc.test_file_strings(&chunk, &pattern);
-        calc.test_entropy_deviation(&chunk, &pattern);
+        if pattern.data.scan_byte_sequences {
+            let byte_points = FilePointCalculator::test_byte_sequence(&pattern, &chunk);
+            if VERBOSE {
+                println!("byte_points = {byte_points}");
+            }
+            all_bytes_match &= byte_points > 0.0 || pattern.data.byte_sequences.is_empty();
+        }
 
-        println!("Total points = {}", calc.points);
+        if pattern.data.scan_strings {
+            let string_points = FilePointCalculator::test_file_strings(&pattern, &chunk);
+            if VERBOSE {
+                println!("string_points = {string_points}");
+            }
+            all_strings_match &= string_points > 0.0 || pattern.data.string_patterns.is_empty();
+        }
+
+        if pattern.data.scan_entropy {
+            let entropy_points = FilePointCalculator::test_entropy_deviation(&pattern, &chunk);
+            if VERBOSE {
+                println!("entropy_points = {entropy_points}");
+            }
+        }
+
+        let extension_points = FilePointCalculator::test_file_extension(&pattern, file);
+        if VERBOSE {
+            println!("extension_points = {extension_points}");
+        }
+
+        if VERBOSE {
+            println!(
+                "confidence_factor = {}",
+                FilePointCalculator::get_confidence_factor(&pattern)
+            );
+        }
+
+        let total_points = FilePointCalculator::compute(&pattern, file);
+        println!(
+            "Total points = {total_points} of {}",
+            pattern.compute_max_points()
+        );
+
+        if VERBOSE {
+            println!("{half_splitter}");
+        }
     }
 
     if all_bytes_match {

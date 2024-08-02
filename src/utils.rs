@@ -1,6 +1,15 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, path::Path};
 
 use walkdir::WalkDir;
+
+pub fn get_file_extension(path: &str) -> String {
+    // Get the file extension, if it exists.
+    if let Some(extension) = Path::new(path).extension() {
+        extension.to_string_lossy().to_string()
+    } else {
+        "".to_string()
+    }
+}
 
 pub fn list_files_of_type(source_directory: &str, target_extension: &str) -> Vec<String> {
     let mut mkv_files = Vec::new();

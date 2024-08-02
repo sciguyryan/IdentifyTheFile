@@ -3,9 +3,10 @@ use serde_derive::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
-use crate::{file_processor, utils};
-
-const VERBOSE: bool = false;
+use crate::{
+    file_point_calculator::{self, CONFIDENCE_SCALE_FACTOR, FILE_EXTENSION_POINTS},
+    file_processor, utils,
+};
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
 pub struct Pattern {
@@ -13,6 +14,7 @@ pub struct Pattern {
     pub data: PatternData,
     pub other_data: PatternOtherData,
     pub submitter_data: PatternSubmitterData,
+    max_points: Option<usize>,
 }
 
 impl Pattern {
@@ -33,6 +35,7 @@ impl Pattern {
             data: PatternData::default(),
             other_data: PatternOtherData::default(),
             submitter_data: PatternSubmitterData::default(),
+            max_points: None,
         }
     }
 
@@ -99,10 +102,6 @@ impl Pattern {
 
         let files = utils::list_files_of_type(source_directory, target_extension);
         for file_path in &files {
-            if VERBOSE {
-                println!("Analyzing candidate file - {file_path}");
-            }
-
             // If we made it here then we have a valid file.
             let chunk =
                 file_processor::read_file_header_chunk(file_path).expect("failed to read file");
@@ -154,6 +153,41 @@ impl Pattern {
 
         self.other_data.total_scanned_files += files.len();
         self.other_data.entropy_bytes = merged_entropy_bytes;
+    }
+
+    /// Computer the maximum number of points that can be awarded for a perfect match against this pattern.
+    /// The more detailed the pattern, the higher the total points available.
+    pub fn compute_max_points(&mut self) -> usize {
+        if let Some(v) = self.max_points {
+            return v;
+        }
+
+        let mut points = 0.0;
+
+        if self.data.scan_byte_sequences {
+            for sequence in self.data.byte_sequences.values() {
+                points += sequence.len() as f64;
+            }
+        }
+
+        if self.data.scan_strings {
+            for string in &self.data.string_patterns {
+                points += string.len() as f64;
+            }
+        }
+
+        if self.data.scan_entropy {
+            points += file_point_calculator::MAX_ENTROPY_POINTS;
+        }
+
+        points += FILE_EXTENSION_POINTS;
+
+        let confidence_factor =
+            (self.other_data.total_scanned_files as f64).powf(CONFIDENCE_SCALE_FACTOR);
+        let scaled_points = (points * confidence_factor).round() as usize;
+
+        self.max_points = Some(scaled_points);
+        scaled_points
     }
 }
 
