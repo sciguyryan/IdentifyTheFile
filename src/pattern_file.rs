@@ -222,7 +222,7 @@ mod tests_pattern {
     use core::str;
     use std::{collections::HashMap, path::Path};
 
-    use crate::file_processor::{get_ascii_readable_characters_set, ASCII_CHARACTER_STRING};
+    use crate::file_processor::ASCII_CHARACTER_STRING;
 
     use super::Pattern;
 
@@ -296,16 +296,10 @@ mod tests_pattern {
         // Testing that all of the safe string characters are returned in a string.
         let pattern = build_test("strings", "8", true, false, false);
 
-        // Build our test string. We need to make sure that character are converted to upper
-        // case since that is what the pattern engine will use.
-        let mut vec = Vec::new();
-        for c in ASCII_CHARACTER_STRING.chars() {
-            vec.push(c.to_ascii_uppercase());
-        }
-
-        let str = String::from_iter(&vec);
-
-        assert_ordered_vec_eq(pattern.data.string_patterns, vec![str]);
+        assert_ordered_vec_eq(
+            pattern.data.string_patterns,
+            vec![ASCII_CHARACTER_STRING.to_ascii_uppercase()],
+        );
     }
 
     #[test]
