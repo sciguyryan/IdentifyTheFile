@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde_derive::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
 use crate::{file_processor, utils};
@@ -118,7 +118,7 @@ impl Pattern {
 
             // On the first pass, we simply set the matching sequence as the entire byte block.
             // This will get trimmed down and split into sections over future loop iterations.
-            if first_byte_sequence_pass {
+            if scan_bytes && first_byte_sequence_pass {
                 common_byte_sequences.insert(0, chunk);
                 first_byte_sequence_pass = false;
                 continue;
@@ -129,10 +129,15 @@ impl Pattern {
             }
         }
 
-        file_processor::strip_sequences_by_length(&mut common_byte_sequences);
+        if scan_bytes {
+            file_processor::strip_sequences_by_length(&mut common_byte_sequences);
+        }
 
         // Sieve the strings to retain only the common ones.
-        let common_strings = file_processor::common_string_sieve(&mut all_strings);
+        let mut common_strings = HashSet::new();
+        if scan_strings {
+            common_strings = file_processor::common_string_sieve(&mut all_strings);
+        }
 
         // Compute the new average file entropy.
         let merged_entropy_bytes =
@@ -215,16 +220,16 @@ pub struct PatternSubmitterData {
 #[cfg(test)]
 mod tests_pattern {
     use core::str;
-    use std::path::Path;
+    use std::{collections::HashMap, path::Path};
 
     use crate::file_processor::ASCII_READABLE_CHARACTERS;
 
     use super::Pattern;
 
     #[test]
-    fn test_string_identification_1() {
+    fn test_string_1() {
         // Basic match, two files both completely matching.
-        let pattern = build_test("strings", "1");
+        let pattern = build_test("strings", "1", true, false);
 
         assert_ordered_vec_eq(
             pattern.data.string_patterns,
@@ -233,28 +238,25 @@ mod tests_pattern {
     }
 
     #[test]
-    fn test_string_identification_2() {
+    fn test_string_2() {
         // Simple non-match, two files and none are matching.
-        let pattern = build_test("strings", "2");
+        let pattern = build_test("strings", "2", true, false);
 
-        assert_ordered_vec_eq(
-            pattern.data.string_patterns,
-            Vec::<String>::with_capacity(0),
-        );
+        assert!(pattern.data.string_patterns.is_empty());
     }
 
     #[test]
-    fn test_string_identification_3() {
+    fn test_string_3() {
         // Simple match, but only a substring is matching.
-        let pattern = build_test("strings", "3");
+        let pattern = build_test("strings", "3", true, false);
 
         assert_ordered_vec_eq(pattern.data.string_patterns, vec!["ABCDE".to_string()]);
     }
 
     #[test]
-    fn test_string_identification_4() {
+    fn test_string_4() {
         // Split match, two substrings will be returned. Delimiter formed by a "non-string" character.
-        let pattern = build_test("strings", "4");
+        let pattern = build_test("strings", "4", true, false);
 
         assert_ordered_vec_eq(
             pattern.data.string_patterns,
@@ -263,17 +265,17 @@ mod tests_pattern {
     }
 
     #[test]
-    fn test_string_identification_5() {
+    fn test_string_5() {
         // Split match, one substrings will be returned.
-        let pattern = build_test("strings", "5");
+        let pattern = build_test("strings", "5", true, false);
 
         assert_ordered_vec_eq(pattern.data.string_patterns, vec!["GHIJK".to_string()]);
     }
 
     #[test]
-    fn test_string_identification_6() {
+    fn test_string_6() {
         // Split match, two substrings will be returned, one will be skipped due to length requirements.
-        let pattern = build_test("strings", "6");
+        let pattern = build_test("strings", "6", true, false);
 
         assert_ordered_vec_eq(
             pattern.data.string_patterns,
@@ -282,17 +284,17 @@ mod tests_pattern {
     }
 
     #[test]
-    fn test_string_identification_7() {
+    fn test_string_7() {
         // Split match, one substring will be returned, one will be skipped due to length requirements.
-        let pattern = build_test("strings", "7");
+        let pattern = build_test("strings", "7", true, false);
 
         assert_ordered_vec_eq(pattern.data.string_patterns, vec!["123456".to_string()]);
     }
 
     #[test]
-    fn test_string_identification_8() {
+    fn test_string_8() {
         // Testing that all of the safe string characters are returned in a string.
-        let pattern = build_test("strings", "8");
+        let pattern = build_test("strings", "8", true, false);
 
         // Build our test string. We need to make sure that character are converted to upper
         // case since that is what the pattern engine will use.
@@ -304,6 +306,89 @@ mod tests_pattern {
         let str = String::from_iter(&vec);
 
         assert_ordered_vec_eq(pattern.data.string_patterns, vec![str]);
+    }
+
+    #[test]
+    fn test_byte_sequence_1() {
+        // Basic match, two files both completely matching.
+        let pattern = build_test("byte_sequences", "1", false, true);
+
+        let expected_set = HashMap::from([(0, (*b"abcdefghijk").to_vec())]);
+
+        assert_eq!(pattern.data.byte_sequences, expected_set,);
+    }
+
+    #[test]
+    fn test_byte_sequence_2() {
+        // Simple non-match, two files and none are matching.
+        let pattern = build_test("byte_sequences", "2", false, true);
+
+        assert_eq!(pattern.data.byte_sequences, HashMap::new());
+    }
+
+    #[test]
+    fn test_byte_sequence_3() {
+        // Simple match, two sub-sequences matching.
+        let pattern = build_test("byte_sequences", "3", false, true);
+
+        let expected_set = HashMap::from([(0, (*b"abcde").to_vec()), (6, (*b"ghijk").to_vec())]);
+
+        assert_eq!(pattern.data.byte_sequences, expected_set,);
+    }
+
+    #[test]
+    fn test_byte_sequence_4() {
+        // Single match, the end of the sequence is offset and so won't match.
+        let pattern = build_test("byte_sequences", "4", false, true);
+
+        let expected_set = HashMap::from([(0, (*b"abcde").to_vec())]);
+
+        assert_eq!(pattern.data.byte_sequences, expected_set,);
+    }
+
+    #[test]
+    fn test_byte_sequence_5() {
+        // No matches.
+        let pattern = build_test("byte_sequences", "5", false, true);
+
+        assert_eq!(pattern.data.byte_sequences, HashMap::new(),);
+    }
+
+    #[test]
+    fn test_byte_sequence_6() {
+        // The entire sequence matches but since the sequence length would
+        // exceed the maximum then it will get split into two segments.
+        let pattern = build_test("byte_sequences", "6", false, true);
+
+        let expected_set = HashMap::from([
+            (0, "abcdefghijkŠaŠ".as_bytes().to_vec()),
+            (16, "123456".as_bytes().to_vec()),
+        ]);
+
+        assert_eq!(pattern.data.byte_sequences, expected_set,);
+    }
+
+    #[test]
+    fn test_byte_sequence_7() {
+        // Split match, two substrings will be returned.
+        let pattern = build_test("byte_sequences", "7", false, true);
+
+        let expected_set = HashMap::from([
+            (13, "a".as_bytes().to_vec()),
+            (16, "123456".as_bytes().to_vec()),
+        ]);
+
+        assert_eq!(pattern.data.byte_sequences, expected_set,);
+    }
+
+    #[test]
+    fn test_byte_sequence_8() {
+        // Single match at the very end.
+        let pattern = build_test("byte_sequences", "8", false, true);
+
+        let expected_set = HashMap::from([(10, "k".as_bytes().to_vec())]);
+
+        assert_eq!(pattern.data.byte_sequences, expected_set,);
     }
 
     fn test_path_builder(test_type: &str, test_id: &str) -> String {
@@ -318,7 +403,7 @@ mod tests_pattern {
         resolved_dir
     }
 
-    fn build_test(test_type: &str, test_id: &str) -> Pattern {
+    fn build_test(test_type: &str, test_id: &str, strings: bool, bytes: bool) -> Pattern {
         // Split match, two substrings will be returned. Delimiter formed by a "non-string" character.
         let test_dir = test_path_builder(test_type, test_id);
 
@@ -328,7 +413,7 @@ mod tests_pattern {
             vec!["test".to_string()],
             vec!["text/plain".to_string()],
         );
-        pattern.build_patterns_from_data(&test_dir, "test", true, false, false);
+        pattern.build_patterns_from_data(&test_dir, "test", strings, bytes, false);
 
         pattern
     }

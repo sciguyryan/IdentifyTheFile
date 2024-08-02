@@ -53,6 +53,10 @@ pub fn calculate_shannon_entropy(frequencies: &HashMap<u8, usize>) -> f64 {
 }
 
 pub fn common_string_sieve(hashsets: &mut Vec<HashSet<String>>) -> HashSet<String> {
+    if hashsets.is_empty() {
+        return HashSet::new();
+    }
+
     // Find largest set to maximise the matching potential.
     let largest_hashset_index = hashsets
         .iter()
@@ -133,11 +137,24 @@ fn extract_matching_sequences(seq_1: &[u8], seq_2: &[u8]) -> HashMap<usize, Vec<
     let mut subsequence = Vec::with_capacity(seq_1.len().min(seq_2.len()));
 
     for (i, (&a, &b)) in seq_1.iter().zip(seq_2.iter()).enumerate() {
+        if subsequence.len() >= MAX_BYTE_SEQUENCE_LENGTH {
+            // End the current sequence if the length would exceed the maximum.
+            if let Some(start) = sequence_start {
+                if !subsequence.is_empty() {
+                    subsequences.insert(start, std::mem::take(&mut subsequence));
+                }
+
+                sequence_start = None;
+                subsequence.clear();
+            }
+        }
+
         if a == b {
             // Start a new sequence, if we aren't already in one.
             if sequence_start.is_none() {
                 sequence_start = Some(i);
             }
+
             subsequence.push(a);
 
             continue;
@@ -255,6 +272,7 @@ pub fn refine_common_byte_sequences_v2(
 
 pub fn strip_sequences_by_length(sequences: &mut HashMap<usize, Vec<u8>>) {
     // Strip any sequences that don't meet the requirements.
-    sequences
-        .retain(|_, b| b.len() >= MIN_BYTE_SEQUENCE_LENGTH && b.len() <= MAX_BYTE_SEQUENCE_LENGTH);
+    // They should never be larger than the maximum length due to the way they are
+    // processed, so we only need to worry about the minimum length requirements here.
+    sequences.retain(|_, b| b.len() >= MIN_BYTE_SEQUENCE_LENGTH);
 }
