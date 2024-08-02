@@ -61,10 +61,12 @@ impl FilePointCalculator {
         for (start, sequence) in &pattern.data.byte_sequences {
             let end = *start + sequence.len();
             if *start > bytes.len() || end > bytes.len() {
+                points = 0.0;
                 break;
             }
 
             if sequence != &bytes[*start..end] {
+                points = 0.0;
                 break;
             } else {
                 points += sequence.len() as f64;

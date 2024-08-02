@@ -116,8 +116,7 @@ pub fn common_string_sieve(hashsets: &mut Vec<HashSet<String>>) -> HashSet<Strin
     // There is one final step here, we do not want to retain any items that are
     // simply substrings of larger items.
     // They won't add anything unique.
-    let mut final_hashset = HashSet::new();
-
+    let mut final_hashset = HashSet::with_capacity(common_strings_hashset.len());
     for item in &common_strings_hashset {
         if !common_strings_hashset
             .iter()
@@ -138,7 +137,7 @@ pub fn count_byte_frequencies(data: &[u8], frequencies: &mut HashMap<u8, usize>)
 
 #[inline]
 fn extract_matching_sequences(seq_1: &[u8], seq_2: &[u8]) -> HashMap<usize, Vec<u8>> {
-    let mut subsequences = HashMap::new();
+    let mut subsequences = HashMap::with_capacity(100);
     let mut sequence_start = None;
     let mut subsequence = Vec::with_capacity(seq_1.len().min(seq_2.len()));
 
@@ -189,7 +188,6 @@ fn extract_matching_sequences(seq_1: &[u8], seq_2: &[u8]) -> HashMap<usize, Vec<
 
 pub fn generate_file_string_hashset(bytes: &[u8]) -> HashSet<String> {
     let mut string_map = HashSet::new();
-
     let mut push_string = false;
     let mut string_buffer = String::with_capacity(MAX_STRING_LENGTH);
     for (i, byte) in bytes.iter().enumerate() {
@@ -223,10 +221,10 @@ pub fn generate_file_string_hashset(bytes: &[u8]) -> HashSet<String> {
 }
 
 fn largest_common_substring<'a>(str_1: &'a str, str_2: &str) -> Option<&'a str> {
-    let mut substrings_str1 = all_substrings_over_min_size(str_1);
-    substrings_str1.sort_unstable_by_key(|b| std::cmp::Reverse(b.len()));
+    let mut str_1_substrings = all_substrings_over_min_size(str_1);
+    str_1_substrings.sort_unstable_by_key(|b| std::cmp::Reverse(b.len()));
 
-    substrings_str1
+    str_1_substrings
         .into_iter()
         .find(|&substr| str_2.contains(substr))
 }

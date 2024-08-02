@@ -3,6 +3,8 @@ pub mod file_processor;
 pub mod pattern;
 pub mod utils;
 
+use std::time::Instant;
+
 use file_point_calculator::FilePointCalculator;
 use pattern::Pattern;
 
@@ -16,8 +18,16 @@ fn main() {
     //let file_dir = "D:\\Downloads\\YouTube";
     let target_extension = "mkv";
 
+    let processing_start = Instant::now();
+
     let mut pattern = Pattern::new("test", "test", vec!["mkv".to_string()], vec![]);
     pattern.build_patterns_from_data(file_dir, target_extension, true, true, true);
+    let max_points = pattern.compute_max_points();
+
+    println!(
+        "Elapsed processing time: {:.2?}",
+        processing_start.elapsed()
+    );
 
     println!("{splitter}");
     let json = serde_json::to_string(&pattern).expect("");
@@ -45,12 +55,14 @@ fn main() {
     }
     println!("{splitter}");
 
+    let start_testing = Instant::now();
+
     // Test files here.
     let mut all_strings_match = true;
     let mut all_bytes_match = true;
     let files = utils::list_files_of_type(file_dir, target_extension);
-    for file in &files {
-        println!("File = {file}");
+    files.iter().for_each(|file| {
+        //println!("File = {file}");
 
         let chunk = file_processor::read_file_header_chunk(file).expect("failed to read file");
 
@@ -89,16 +101,14 @@ fn main() {
             );
         }
 
-        let total_points = FilePointCalculator::compute(&pattern, file);
-        println!(
-            "Total points = {total_points} of {}",
-            pattern.compute_max_points()
-        );
-
         if VERBOSE {
+            let total_points = FilePointCalculator::compute(&pattern, file);
+            println!("Total points = {total_points} of {max_points:?}");
             println!("{half_splitter}");
         }
-    }
+    });
+
+    println!("Elapsed testing time: {:.2?}", start_testing.elapsed());
 
     if all_bytes_match {
         println!("\x1b[92mSuccessfully matched all applicable byte sequences!\x1b[0m");

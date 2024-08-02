@@ -1,7 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde_derive::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use uuid::Uuid;
 
 use crate::{
     file_point_calculator::{self, CONFIDENCE_SCALE_FACTOR, FILE_EXTENSION_POINTS},
@@ -14,7 +13,8 @@ pub struct Pattern {
     pub data: PatternData,
     pub other_data: PatternOtherData,
     pub submitter_data: PatternSubmitterData,
-    max_points: Option<usize>,
+    #[serde(skip)]
+    pub max_points: Option<usize>,
 }
 
 impl Pattern {
@@ -30,7 +30,7 @@ impl Pattern {
                 description: description.to_string(),
                 known_extensions: known_extensions.iter().map(|s| s.to_uppercase()).collect(),
                 known_mimetypes,
-                uuid: Uuid::now_v7(),
+                uuid: utils::make_uuid(),
             },
             data: PatternData::default(),
             other_data: PatternOtherData::default(),
@@ -73,14 +73,14 @@ impl Pattern {
         &mut self,
         scanned_by: String,
         scanned_by_email: String,
-        submitted_on: DateTime<Utc>,
+        scanned_on: DateTime<Utc>,
         refined_by: Vec<String>,
         refined_by_email: Vec<String>,
     ) {
         self.submitter_data = PatternSubmitterData {
             scanned_by,
             scanned_by_email,
-            submitted_on,
+            scanned_on,
             refined_by,
             refined_by_email,
         };
@@ -202,7 +202,7 @@ pub struct PatternTypeData {
     /// Any known mimetypes for this file type.
     pub known_mimetypes: Vec<String>,
     /// The UUID of the pattern file.
-    pub uuid: Uuid,
+    pub uuid: String,
 }
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
@@ -252,7 +252,7 @@ pub struct PatternOtherData {
 pub struct PatternSubmitterData {
     pub scanned_by: String,
     pub scanned_by_email: String,
-    pub submitted_on: DateTime<Utc>,
+    pub scanned_on: DateTime<Utc>,
     pub refined_by: Vec<String>,
     pub refined_by_email: Vec<String>,
 }

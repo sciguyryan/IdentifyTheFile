@@ -1,3 +1,4 @@
+use rand::Rng;
 use std::{collections::HashMap, path::Path};
 
 use walkdir::WalkDir;
@@ -31,6 +32,24 @@ pub fn list_files_of_type(source_directory: &str, target_extension: &str) -> Vec
     }
 
     mkv_files
+}
+
+pub fn make_uuid() -> String {
+    // Generate a random u128 value.
+    let random: u128 = rand::thread_rng().gen();
+
+    // Format the value as a hex string with zero padding to ensure it has 32 characters.
+    let hex = format!("{:032x}", random);
+
+    // Split the string into parts and insert dashes according to UUID format.
+    format!(
+        "{}-{}-{}-{}-{}",
+        &hex[0..8],
+        &hex[8..12],
+        &hex[12..16],
+        &hex[16..20],
+        &hex[20..32]
+    )
 }
 
 pub fn merge_hashmaps(maps: Vec<&HashMap<u8, usize>>) -> HashMap<u8, usize> {
