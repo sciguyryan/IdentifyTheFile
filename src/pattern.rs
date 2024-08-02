@@ -24,16 +24,11 @@ impl Pattern {
         known_extensions: Vec<String>,
         known_mimetypes: Vec<String>,
     ) -> Self {
-        let mut upper_extensions = vec![];
-        for ext in known_extensions {
-            upper_extensions.push(ext.to_uppercase());
-        }
-
         Self {
             type_data: PatternTypeData {
                 name: name.to_string(),
                 description: description.to_string(),
-                known_extensions: upper_extensions,
+                known_extensions: known_extensions.iter().map(|s| s.to_uppercase()).collect(),
                 known_mimetypes,
                 uuid: Uuid::now_v7(),
             },

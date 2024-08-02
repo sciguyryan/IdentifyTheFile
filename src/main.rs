@@ -36,7 +36,6 @@ fn main() {
         println!("Matching positional byte sequences...");
         utils::print_byte_sequence_matches(&pattern.data.byte_sequences);
     }
-
     println!("{splitter}");
     if pattern.data.string_patterns.is_empty() {
         println!("No common strings were found!");
