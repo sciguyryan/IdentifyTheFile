@@ -1,6 +1,11 @@
 use chrono::{DateTime, Utc};
 use serde_derive::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    fs::File,
+    io::Write,
+    path::PathBuf,
+};
 
 use crate::{
     file_point_calculator::{self, FilePointCalculator, FILE_EXTENSION_POINTS},
@@ -127,6 +132,11 @@ impl Pattern {
         }
 
         if scan_bytes {
+            // Sort the sequence, to make it prettier.
+            common_byte_sequences.sort_by(|a, b| a.0.cmp(&b.0));
+        }
+
+        if scan_bytes {
             file_processor::strip_sequences_by_length(&mut common_byte_sequences);
         }
 
@@ -190,9 +200,19 @@ impl Pattern {
         rounded_points
     }
 
-    pub fn get_pattern_file_name(&self) -> String {
+    fn get_pattern_file_name(&self) -> String {
         let file_name = utils::remove_invalid_file_name(&self.type_data.name);
         file_name.replace(" ", "-") + ".json"
+    }
+
+    pub fn write(&self, path: &str) -> std::io::Result<()> {
+        let serialized = serde_json::to_string(self).unwrap();
+
+        let mut path = PathBuf::from(path);
+        path.push(self.get_pattern_file_name());
+
+        let mut output = File::create(path)?;
+        write!(output, "{serialized}")
     }
 }
 

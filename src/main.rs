@@ -41,6 +41,8 @@ fn main() {
     pattern.add_submitter_data(user_name, user_email);
     let max_points = pattern.compute_max_points();
 
+    println!("{:?}", pattern.write("D:\\temp\\"));
+
     println!(
         "Elapsed processing time: {:.2?}",
         processing_start.elapsed()
