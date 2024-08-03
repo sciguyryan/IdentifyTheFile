@@ -468,6 +468,16 @@ mod tests_pattern {
     }
 
     #[test]
+    fn test_byte_sequence_9() {
+        // Single match at the beginning. The null byte sequence should be stripped.
+        let pattern = build_test("byte_sequences", "9", false, true, false);
+
+        let expected_set = vec![(0, "abcdefghijk".as_bytes().to_vec())];
+
+        assert_eq!(pattern.data.byte_sequences, expected_set);
+    }
+
+    #[test]
     fn test_entropy_1() {
         let pattern = build_test("entropy", "1", false, false, true);
 

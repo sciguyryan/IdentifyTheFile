@@ -30,14 +30,13 @@ fn main() {
     let splitter = "-".repeat(54);
     let half_splitter = "-".repeat(27);
 
-    let file_dir = "D:\\GitHub\\IdentifyTheFile\\samples";
-    //let file_dir = "D:\\Downloads\\YouTube";
+    let sample_directory = "D:\\Storage\\File Type Samples\\mkv";
     let target_extension = "mkv";
 
     let processing_start = Instant::now();
 
     let mut pattern = Pattern::new("test waffles", "test", vec!["mkv".to_string()], vec![]);
-    pattern.build_patterns_from_data(file_dir, target_extension, true, true, true);
+    pattern.build_patterns_from_data(sample_directory, target_extension, true, true, true);
     pattern.add_submitter_data(user_name, user_email);
     let max_points = pattern.compute_max_points();
 
@@ -79,7 +78,7 @@ fn main() {
     // Test files here.
     let mut all_strings_match = true;
     let mut all_bytes_match = true;
-    let files = utils::list_files_of_type(file_dir, target_extension);
+    let files = utils::list_files_of_type("D:\\Downloads\\YouTube", target_extension);
     files.iter().for_each(|file| {
         //println!("File = {file}");
 
