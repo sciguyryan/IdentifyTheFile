@@ -3,7 +3,7 @@ pub mod file_processor;
 pub mod pattern;
 pub mod utils;
 
-use std::time::Instant;
+use std::{env, time::Instant};
 
 use file_point_calculator::FilePointCalculator;
 use pattern::Pattern;
@@ -11,6 +11,22 @@ use pattern::Pattern;
 const VERBOSE: bool = false;
 
 fn main() {
+    let args: Vec<String> = env::args().collect();
+
+    let mut user_name = "";
+    let mut user_email = "";
+
+    for (i, arg) in args.iter().enumerate() {
+        let next_index = i + 1;
+        if (arg == "--user" || arg == "-u") && next_index < args.len() {
+            user_name = &args[i+1];
+        }
+
+        if (arg == "--email" || arg == "-e") && next_index < args.len() {
+            user_email = &args[i+1];
+        }
+    }
+
     let splitter = "-".repeat(54);
     let half_splitter = "-".repeat(27);
 
@@ -22,6 +38,7 @@ fn main() {
 
     let mut pattern = Pattern::new("test", "test", vec!["mkv".to_string()], vec![]);
     pattern.build_patterns_from_data(file_dir, target_extension, true, true, true);
+    pattern.add_submitter_data(user_name, user_email);
     let max_points = pattern.compute_max_points();
 
     println!(

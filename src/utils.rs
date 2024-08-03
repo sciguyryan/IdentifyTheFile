@@ -3,9 +3,9 @@ use std::{collections::HashMap, path::Path};
 
 use walkdir::WalkDir;
 
-pub fn get_file_extension(path: &str) -> String {
+pub fn get_file_extension<P: AsRef<Path>>(path: P) -> String {
     // Get the file extension, if it exists.
-    if let Some(extension) = Path::new(path).extension() {
+    if let Some(extension) = path.as_ref().extension() {
         extension.to_string_lossy().to_uppercase()
     } else {
         "".to_string()
@@ -13,25 +13,13 @@ pub fn get_file_extension(path: &str) -> String {
 }
 
 pub fn list_files_of_type(source_directory: &str, target_extension: &str) -> Vec<String> {
-    let mut mkv_files = Vec::new();
-
-    for entry in WalkDir::new(source_directory)
+    WalkDir::new(source_directory)
         .into_iter()
         .filter_map(Result::ok)
         .filter(|e| e.path().is_file())
-    {
-        if let Some(ext) = entry.path().extension() {
-            if ext != target_extension {
-                continue;
-            }
-
-            if let Some(path_str) = entry.path().to_str() {
-                mkv_files.push(path_str.to_string());
-            }
-        }
-    }
-
-    mkv_files
+        .filter(|e| get_file_extension(e.path()) == target_extension.to_uppercase())
+        .filter_map(|e| e.path().to_str().map(|s| s.to_string()))
+        .collect()
 }
 
 pub fn make_uuid() -> String {

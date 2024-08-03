@@ -71,18 +71,15 @@ impl Pattern {
 
     pub fn add_submitter_data(
         &mut self,
-        scanned_by: String,
-        scanned_by_email: String,
-        scanned_on: DateTime<Utc>,
-        refined_by: Vec<String>,
-        refined_by_email: Vec<String>,
+        scanned_by: &str,
+        scanned_by_email: &str,
     ) {
         self.submitter_data = PatternSubmitterData {
-            scanned_by,
-            scanned_by_email,
-            scanned_on,
-            refined_by,
-            refined_by_email,
+            scanned_by: scanned_by.to_string(),
+            scanned_by_email: scanned_by_email.to_string(),
+            scanned_on: chrono::offset::Utc::now(),
+            refined_by: vec![],
+            refined_by_email: vec![],
         };
     }
 
@@ -205,7 +202,7 @@ pub struct PatternTypeData {
     pub uuid: String,
 }
 
-#[derive(Clone, Default, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct PatternData {
     /// Should we scan for strings in this file type?
     pub scan_strings: bool,
@@ -248,13 +245,25 @@ pub struct PatternOtherData {
     pub entropy_bytes: HashMap<u8, usize>,
 }
 
-#[derive(Clone, Default, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PatternSubmitterData {
     pub scanned_by: String,
     pub scanned_by_email: String,
     pub scanned_on: DateTime<Utc>,
     pub refined_by: Vec<String>,
     pub refined_by_email: Vec<String>,
+}
+
+impl Default for PatternSubmitterData {
+    fn default() -> Self {
+        Self {
+            scanned_by: Default::default(),
+            scanned_by_email: Default::default(),
+            scanned_on: chrono::offset::Utc::now(),
+            refined_by: Default::default(),
+            refined_by_email: Default::default()
+        }
+    }
 }
 
 #[cfg(test)]
