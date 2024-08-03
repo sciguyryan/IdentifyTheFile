@@ -22,9 +22,6 @@ pub struct Pattern {
     pub other_data: PatternOtherData,
     /// The submitter information, if specified.
     pub submitter_data: PatternSubmitterData,
-    #[serde(skip)]
-    /// The maximum number of points that can be achieved for a perfect match against this pattern.
-    pub max_points: Option<usize>,
 }
 
 impl Pattern {
@@ -45,7 +42,6 @@ impl Pattern {
             data: PatternData::default(),
             other_data: PatternOtherData::default(),
             submitter_data: PatternSubmitterData::default(),
-            max_points: None,
         }
     }
 
@@ -159,43 +155,6 @@ impl Pattern {
 
         self.other_data.total_scanned_files += files.len();
         self.other_data.entropy_bytes = merged_entropy_bytes;
-    }
-
-    /// Computer the maximum number of points that can be awarded for a perfect match against this pattern.
-    /// The more detailed the pattern, the higher the total points available.
-    pub fn compute_max_points(&mut self) -> usize {
-        if let Some(v) = self.max_points {
-            return v;
-        }
-
-        let mut points = 0.0;
-
-        if self.data.scan_byte_sequences {
-            for (_, sequence) in &self.data.byte_sequences {
-                points += sequence.len() as f64;
-            }
-        }
-
-        if self.data.scan_strings {
-            for string in &self.data.string_patterns {
-                points += string.len() as f64;
-            }
-        }
-
-        if self.data.scan_entropy {
-            points += file_point_calculator::MAX_ENTROPY_POINTS;
-        }
-
-        // Scale the relevant points by the confidence factor derived from the total files scanned.
-        points *= FilePointCalculator::get_confidence_factor(self);
-
-        // The file extension is considered a separate factor and doesn't scale with the number
-        // of scanned files.
-        points += FILE_EXTENSION_POINTS;
-
-        let rounded_points = points.round() as usize;
-        self.max_points = Some(rounded_points);
-        rounded_points
     }
 
     fn get_pattern_file_name(&self) -> String {

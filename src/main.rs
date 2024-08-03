@@ -38,7 +38,7 @@ fn main() {
     let mut pattern = Pattern::new("test waffles", "test", vec!["mkv".to_string()], vec![]);
     pattern.build_patterns_from_data(sample_directory, target_extension, true, true, true);
     pattern.add_submitter_data(user_name, user_email);
-    let max_points = pattern.compute_max_points();
+    let max_points = FilePointCalculator::compute_max_points(&pattern);
 
     println!("{:?}", pattern.write("D:\\temp\\"));
 

@@ -23,7 +23,7 @@ impl FilePointCalculator {
         let mut points = 0.0;
 
         if pattern.data.scan_byte_sequences {
-            points += FilePointCalculator::test_byte_sequence(pattern, &chunk);
+            points += Self::test_byte_sequence(pattern, &chunk);
 
             // Byte sequence matches, if specified, MUST exist for a match to be valid at all.
             // If the points returned are zero, the file cannot be a match.
@@ -34,19 +34,50 @@ impl FilePointCalculator {
         }
 
         if pattern.data.scan_strings {
-            points += FilePointCalculator::test_file_strings(pattern, &chunk);
+            points += Self::test_file_strings(pattern, &chunk);
         }
 
         if pattern.data.scan_entropy {
-            points += FilePointCalculator::test_entropy_deviation(pattern, &chunk);
+            points += Self::test_entropy_deviation(pattern, &chunk);
         }
 
         // Scale the relevant points by the confidence factor derived from the total files scanned.
-        points *= FilePointCalculator::get_confidence_factor(pattern);
+        points *= Self::get_confidence_factor(pattern);
 
         // The file extension is considered a separate factor and doesn't scale with the number
         // of scanned files.
-        points += FilePointCalculator::test_file_extension(pattern, path);
+        points += Self::test_file_extension(pattern, path);
+
+        points.round() as usize
+    }
+
+    /// Computer the maximum number of points that can be awarded for a perfect match against this pattern.
+    /// The more detailed the pattern, the higher the total points available.
+    pub fn compute_max_points(pattern: &Pattern) -> usize {
+        let mut points = 0.0;
+
+        if pattern.data.scan_byte_sequences {
+            for (_, sequence) in &pattern.data.byte_sequences {
+                points += sequence.len() as f64;
+            }
+        }
+
+        if pattern.data.scan_strings {
+            for string in &pattern.data.string_patterns {
+                points += string.len() as f64;
+            }
+        }
+
+        if pattern.data.scan_entropy {
+            points += MAX_ENTROPY_POINTS;
+        }
+
+        // Scale the relevant points by the confidence factor derived from the total files scanned.
+        points *= Self::get_confidence_factor(pattern);
+
+        // The file extension is considered a separate factor and doesn't scale with the number
+        // of scanned files.
+        points += FILE_EXTENSION_POINTS;
 
         points.round() as usize
     }
