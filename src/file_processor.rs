@@ -280,9 +280,9 @@ pub fn refine_common_byte_sequences_v2(
     *common_byte_sequences = final_sequences;
 }
 
-pub fn strip_sequences_by_length(sequences: &mut Vec<(usize, Vec<u8>)>) {
+pub fn strip_unwanted_sequences(sequences: &mut Vec<(usize, Vec<u8>)>) {
     // Strip any sequences that don't meet the requirements.
-    // They should never be larger than the maximum length due to the way they are
-    // processed, so we only need to worry about the minimum length requirements here.
-    sequences.retain(|(_, b)| b.len() >= MIN_BYTE_SEQUENCE_LENGTH);
+    // 1. Any sequences that are below the minimum length requirement. Maximum length enforcement is done elsewhere.
+    // 2. Any sequences that are purely null bytes. These are unlikely to be helpful.
+    sequences.retain(|(_, b)| b.iter().all(|&x| x != 0) && b.len() >= MIN_BYTE_SEQUENCE_LENGTH);
 }

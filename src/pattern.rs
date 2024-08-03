@@ -132,12 +132,10 @@ impl Pattern {
         }
 
         if scan_bytes {
+            file_processor::strip_unwanted_sequences(&mut common_byte_sequences);
+
             // Sort the sequence, to make it prettier.
             common_byte_sequences.sort_by(|a, b| a.0.cmp(&b.0));
-        }
-
-        if scan_bytes {
-            file_processor::strip_sequences_by_length(&mut common_byte_sequences);
         }
 
         // Sieve the strings to retain only the common ones.
