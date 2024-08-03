@@ -43,13 +43,13 @@ impl FilePointCalculator {
 
         let confidence_factor = FilePointCalculator::get_confidence_factor(pattern);
 
-        let mut scaled_points = points * confidence_factor;
+        points *= confidence_factor;
 
         // The file extension is considered a separate factor and doesn't scale with the number
         // of scanned files.
-        scaled_points += FilePointCalculator::test_file_extension(pattern, path);
+        points += FilePointCalculator::test_file_extension(pattern, path);
 
-        scaled_points.round() as usize
+        points.round() as usize
     }
 
     pub fn get_confidence_factor(pattern: &Pattern) -> f64 {
