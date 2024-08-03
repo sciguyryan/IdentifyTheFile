@@ -41,9 +41,8 @@ impl FilePointCalculator {
             points += FilePointCalculator::test_entropy_deviation(pattern, &chunk);
         }
 
-        let confidence_factor = FilePointCalculator::get_confidence_factor(pattern);
-
-        points *= confidence_factor;
+        // Scale the relevant points by the confidence factor derived from the total files scanned.
+        points *= FilePointCalculator::get_confidence_factor(pattern);
 
         // The file extension is considered a separate factor and doesn't scale with the number
         // of scanned files.

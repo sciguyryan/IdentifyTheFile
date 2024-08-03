@@ -3,17 +3,22 @@ use serde_derive::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-    file_point_calculator::{self, CONFIDENCE_SCALE_FACTOR, FILE_EXTENSION_POINTS},
+    file_point_calculator::{self, FilePointCalculator, FILE_EXTENSION_POINTS},
     file_processor, utils,
 };
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
 pub struct Pattern {
+    /// The basic pattern information.
     pub type_data: PatternTypeData,
+    /// The pattern data to be used when performing a scan.
     pub data: PatternData,
+    /// Any other data that may be associated with the pattern.
     pub other_data: PatternOtherData,
+    /// The submitter information, if specified.
     pub submitter_data: PatternSubmitterData,
     #[serde(skip)]
+    /// The maximum number of points that can be achieved for a perfect match against this pattern.
     pub max_points: Option<usize>,
 }
 
@@ -42,7 +47,7 @@ impl Pattern {
     pub fn add_pattern_data(
         &mut self,
         scan_strings: bool,
-        string_patterns: Vec<String>,
+        string_patterns: HashSet<String>,
         scan_byte_sequences: bool,
         byte_sequences: HashMap<usize, Vec<u8>>,
         scan_entropy: bool,
@@ -137,7 +142,7 @@ impl Pattern {
 
         // Add the computed information into the struct.
         self.data.scan_strings = scan_strings;
-        self.data.string_patterns = Vec::from_iter(common_strings);
+        self.data.string_patterns = HashSet::from_iter(common_strings);
         self.data.scan_byte_sequences = scan_bytes;
         self.data.byte_sequences = common_byte_sequences;
         self.data.scan_entropy = scan_entropy;
@@ -173,10 +178,8 @@ impl Pattern {
             points += file_point_calculator::MAX_ENTROPY_POINTS;
         }
 
-        let confidence_factor =
-            (self.other_data.total_scanned_files as f64).powf(CONFIDENCE_SCALE_FACTOR);
-
-        points *= confidence_factor;
+        // Scale the relevant points by the confidence factor derived from the total files scanned.
+        points *= FilePointCalculator::get_confidence_factor(self);
 
         // The file extension is considered a separate factor and doesn't scale with the number
         // of scanned files.
@@ -211,7 +214,7 @@ pub struct PatternData {
     ///
     /// # Notes
     /// String matches are optional and a missing string will not render the match void.
-    pub string_patterns: Vec<String>,
+    pub string_patterns: HashSet<String>,
     /// Should we scan for byte sequences?
     pub scan_byte_sequences: bool,
     /// Any positional byte sequences that may be associated with this file type.
@@ -247,10 +250,15 @@ pub struct PatternOtherData {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PatternSubmitterData {
+    /// The name of the person who performed the initial scan. May be left blank.
     pub scanned_by: String,
+    /// The email of the person who performed the initial scan. May be left blank.
     pub scanned_by_email: String,
+    /// The timestamp for when the initial scan was performed.
     pub scanned_on: DateTime<Utc>,
+    /// The list of names of the people that performed refinements on the scan. May be empty.
     pub refined_by: Vec<String>,
+    /// The list of email addresses of the people that performed refinements on the scan. May be empty.
     pub refined_by_email: Vec<String>,
 }
 
@@ -269,7 +277,10 @@ impl Default for PatternSubmitterData {
 #[cfg(test)]
 mod tests_pattern {
     use core::str;
-    use std::{collections::HashMap, path::Path};
+    use std::{
+        collections::{HashMap, HashSet},
+        path::Path,
+    };
 
     use crate::{file_processor::ASCII_CHARACTER_STRING, utils};
 
@@ -280,10 +291,9 @@ mod tests_pattern {
         // Basic match, two files both completely matching.
         let pattern = build_test("strings", "1", true, false, false);
 
-        assert_ordered_vec_eq(
-            pattern.data.string_patterns,
-            vec!["ABCDEFGHIJK".to_string()],
-        );
+        let set = HashSet::from(["ABCDEFGHIJK".to_string()]);
+
+        assert_eq!(pattern.data.string_patterns, set,);
     }
 
     #[test]
@@ -299,7 +309,9 @@ mod tests_pattern {
         // Simple match, but only a substring is matching.
         let pattern = build_test("strings", "3", true, false, false);
 
-        assert_ordered_vec_eq(pattern.data.string_patterns, vec!["ABCDE".to_string()]);
+        let set = HashSet::from(["ABCDE".to_string()]);
+
+        assert_eq!(pattern.data.string_patterns, set,);
     }
 
     #[test]
@@ -307,10 +319,9 @@ mod tests_pattern {
         // Split match, two substrings will be returned. Delimiter formed by a "non-string" character.
         let pattern = build_test("strings", "4", true, false, false);
 
-        assert_ordered_vec_eq(
-            pattern.data.string_patterns,
-            vec!["ABCDE".to_string(), "GHIJK".to_string()],
-        );
+        let set = HashSet::from(["ABCDE".to_string(), "GHIJK".to_string()]);
+
+        assert_eq!(pattern.data.string_patterns, set,);
     }
 
     #[test]
@@ -318,7 +329,9 @@ mod tests_pattern {
         // Split match, one substrings will be returned.
         let pattern = build_test("strings", "5", true, false, false);
 
-        assert_ordered_vec_eq(pattern.data.string_patterns, vec!["GHIJK".to_string()]);
+        let set = HashSet::from(["GHIJK".to_string()]);
+
+        assert_eq!(pattern.data.string_patterns, set,);
     }
 
     #[test]
@@ -326,10 +339,9 @@ mod tests_pattern {
         // Split match, two substrings will be returned, one will be skipped due to length requirements.
         let pattern = build_test("strings", "6", true, false, false);
 
-        assert_ordered_vec_eq(
-            pattern.data.string_patterns,
-            vec!["ABCDEFGHIJK".to_string(), "123456".to_string()],
-        );
+        let set = HashSet::from(["ABCDEFGHIJK".to_string(), "123456".to_string()]);
+
+        assert_eq!(pattern.data.string_patterns, set,);
     }
 
     #[test]
@@ -337,7 +349,9 @@ mod tests_pattern {
         // Split match, one substring will be returned, one will be skipped due to length requirements.
         let pattern = build_test("strings", "7", true, false, false);
 
-        assert_ordered_vec_eq(pattern.data.string_patterns, vec!["123456".to_string()]);
+        let set = HashSet::from(["123456".to_string()]);
+
+        assert_eq!(pattern.data.string_patterns, set,);
     }
 
     #[test]
@@ -345,10 +359,9 @@ mod tests_pattern {
         // Testing that all of the safe string characters are returned in a string.
         let pattern = build_test("strings", "8", true, false, false);
 
-        assert_ordered_vec_eq(
-            pattern.data.string_patterns,
-            vec![ASCII_CHARACTER_STRING.to_ascii_uppercase()],
-        );
+        let set = HashSet::from([ASCII_CHARACTER_STRING.to_ascii_uppercase()]);
+
+        assert_eq!(pattern.data.string_patterns, set,);
     }
 
     #[test]
@@ -504,15 +517,5 @@ mod tests_pattern {
         pattern.build_patterns_from_data(&test_dir, "test", strings, bytes, entropy);
 
         pattern
-    }
-
-    fn assert_ordered_vec_eq(vec_1: Vec<String>, vec_2: Vec<String>) {
-        let mut ordered_vec_1 = vec_1;
-        ordered_vec_1.sort();
-
-        let mut ordered_vec_2 = vec_2;
-        ordered_vec_2.sort();
-
-        assert_eq!(ordered_vec_1, ordered_vec_2);
     }
 }
