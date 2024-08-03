@@ -118,11 +118,11 @@ fn main() {
             );
         }
 
-        if VERBOSE {
-            let total_points = FilePointCalculator::compute(&pattern, file);
-            println!("Total points = {total_points} of {max_points:?}");
-            println!("{half_splitter}");
-        }
+        //if VERBOSE {
+        let total_points = FilePointCalculator::compute(&pattern, file);
+        println!("Total points = {total_points} of {max_points:?}");
+        println!("{half_splitter}");
+        //}
     });
 
     println!("Elapsed testing time: {:.2?}", start_testing.elapsed());

@@ -173,14 +173,19 @@ impl Pattern {
             points += file_point_calculator::MAX_ENTROPY_POINTS;
         }
 
-        points += FILE_EXTENSION_POINTS;
-
         let confidence_factor =
             (self.other_data.total_scanned_files as f64).powf(CONFIDENCE_SCALE_FACTOR);
-        let scaled_points = (points * confidence_factor).round() as usize;
 
-        self.max_points = Some(scaled_points);
-        scaled_points
+        let mut scaled_points = points * confidence_factor;
+
+        // The file extension is considered a separate factor and doesn't scale with the number
+        // of scanned files.
+        scaled_points += FILE_EXTENSION_POINTS;
+
+        let rounded_points = scaled_points.round() as usize;
+
+        self.max_points = Some(rounded_points);
+        rounded_points
     }
 }
 

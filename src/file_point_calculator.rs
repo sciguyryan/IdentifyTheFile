@@ -41,11 +41,15 @@ impl FilePointCalculator {
             points += FilePointCalculator::test_entropy_deviation(pattern, &chunk);
         }
 
-        points += FilePointCalculator::test_file_extension(pattern, path);
-
         let confidence_factor = FilePointCalculator::get_confidence_factor(pattern);
 
-        (points * confidence_factor).round() as usize
+        let mut scaled_points = points * confidence_factor;
+
+        // The file extension is considered a separate factor and doesn't scale with the number
+        // of scanned files.
+        scaled_points += FilePointCalculator::test_file_extension(pattern, path);
+
+        scaled_points.round() as usize
     }
 
     pub fn get_confidence_factor(pattern: &Pattern) -> f64 {
@@ -70,23 +74,6 @@ impl FilePointCalculator {
                 break;
             } else {
                 points += sequence.len() as f64;
-            }
-        }
-
-        points
-    }
-
-    pub fn test_file_strings(pattern: &Pattern, bytes: &[u8]) -> f64 {
-        if !pattern.data.scan_strings || pattern.data.string_patterns.is_empty() {
-            return 0.0;
-        }
-
-        let strings = file_processor::generate_file_string_hashset(bytes);
-
-        let mut points = 0.0;
-        for str in &pattern.data.string_patterns {
-            if strings.contains(str) {
-                points += str.len() as f64;
             }
         }
 
@@ -138,5 +125,22 @@ impl FilePointCalculator {
         } else {
             0.0
         }
+    }
+
+    pub fn test_file_strings(pattern: &Pattern, bytes: &[u8]) -> f64 {
+        if !pattern.data.scan_strings || pattern.data.string_patterns.is_empty() {
+            return 0.0;
+        }
+
+        let strings = file_processor::generate_file_string_hashset(bytes);
+
+        let mut points = 0.0;
+        for str in &pattern.data.string_patterns {
+            if strings.contains(str) {
+                points += str.len() as f64;
+            }
+        }
+
+        points
     }
 }
