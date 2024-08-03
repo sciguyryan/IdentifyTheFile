@@ -19,11 +19,11 @@ fn main() {
     for (i, arg) in args.iter().enumerate() {
         let next_index = i + 1;
         if (arg == "--user" || arg == "-u") && next_index < args.len() {
-            user_name = &args[i+1];
+            user_name = &args[i + 1];
         }
 
         if (arg == "--email" || arg == "-e") && next_index < args.len() {
-            user_email = &args[i+1];
+            user_email = &args[i + 1];
         }
     }
 

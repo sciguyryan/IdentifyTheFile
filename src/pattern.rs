@@ -69,11 +69,7 @@ impl Pattern {
         };
     }
 
-    pub fn add_submitter_data(
-        &mut self,
-        scanned_by: &str,
-        scanned_by_email: &str,
-    ) {
+    pub fn add_submitter_data(&mut self, scanned_by: &str, scanned_by_email: &str) {
         self.submitter_data = PatternSubmitterData {
             scanned_by: scanned_by.to_string(),
             scanned_by_email: scanned_by_email.to_string(),
@@ -261,7 +257,7 @@ impl Default for PatternSubmitterData {
             scanned_by_email: Default::default(),
             scanned_on: chrono::offset::Utc::now(),
             refined_by: Default::default(),
-            refined_by_email: Default::default()
+            refined_by_email: Default::default(),
         }
     }
 }
