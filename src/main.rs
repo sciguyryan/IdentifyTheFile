@@ -30,13 +30,13 @@ fn main() {
     let splitter = "-".repeat(54);
     let half_splitter = "-".repeat(27);
 
-    let file_dir = "D:\\GitHub\\IdentifyTheFile\\samples\\mkv";
+    let file_dir = "D:\\GitHub\\IdentifyTheFile\\samples";
     //let file_dir = "D:\\Downloads\\YouTube";
     let target_extension = "mkv";
 
     let processing_start = Instant::now();
 
-    let mut pattern = Pattern::new("test", "test", vec!["mkv".to_string()], vec![]);
+    let mut pattern = Pattern::new("test waffles", "test", vec!["mkv".to_string()], vec![]);
     pattern.build_patterns_from_data(file_dir, target_extension, true, true, true);
     pattern.add_submitter_data(user_name, user_email);
     let max_points = pattern.compute_max_points();

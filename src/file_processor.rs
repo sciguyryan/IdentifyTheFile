@@ -6,6 +6,8 @@ use std::{
     sync::OnceLock,
 };
 
+use crate::pattern::Pattern;
+
 pub const ASCII_CHARACTER_STRING: &str =
     " !#$+,-./0123456789<=>?ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz";
 pub static ASCII_READABLE_CHARACTERS: OnceLock<Vec<u8>> = OnceLock::new();
@@ -220,6 +222,10 @@ pub fn generate_file_string_hashset(bytes: &[u8]) -> HashSet<String> {
     string_map
 }
 
+fn process_files(directory: &str, target_extension: &str) -> Pattern {
+    Pattern::default()
+}
+
 fn largest_common_substring<'a>(str_1: &'a str, str_2: &str) -> Option<&'a str> {
     let mut str_1_substrings = all_substrings_over_min_size(str_1);
     str_1_substrings.sort_unstable_by_key(|b| std::cmp::Reverse(b.len()));
@@ -242,9 +248,9 @@ pub fn read_file_header_chunk(file_path: &str) -> io::Result<Vec<u8>> {
 
 pub fn refine_common_byte_sequences_v2(
     file_bytes: &[u8],
-    common_byte_sequences: &mut HashMap<usize, Vec<u8>>,
+    common_byte_sequences: &mut Vec<(usize, Vec<u8>)>,
 ) {
-    let mut final_sequences = HashMap::with_capacity(common_byte_sequences.len());
+    let mut final_sequences = Vec::with_capacity(common_byte_sequences.len());
 
     for (index, test_sequence) in common_byte_sequences.iter() {
         if *index > file_bytes.len() {
@@ -267,16 +273,16 @@ pub fn refine_common_byte_sequences_v2(
         // over the entire file, not the substring. This means we need
         // to add the overall index to the sub index!
         for (sub_index, seq) in subsequences {
-            final_sequences.insert(*index + sub_index, seq);
+            final_sequences.push((*index + sub_index, seq));
         }
     }
 
     *common_byte_sequences = final_sequences;
 }
 
-pub fn strip_sequences_by_length(sequences: &mut HashMap<usize, Vec<u8>>) {
+pub fn strip_sequences_by_length(sequences: &mut Vec<(usize, Vec<u8>)>) {
     // Strip any sequences that don't meet the requirements.
     // They should never be larger than the maximum length due to the way they are
     // processed, so we only need to worry about the minimum length requirements here.
-    sequences.retain(|_, b| b.len() >= MIN_BYTE_SEQUENCE_LENGTH);
+    sequences.retain(|(_, b)| b.len() >= MIN_BYTE_SEQUENCE_LENGTH);
 }

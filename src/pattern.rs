@@ -49,7 +49,7 @@ impl Pattern {
         scan_strings: bool,
         string_patterns: HashSet<String>,
         scan_byte_sequences: bool,
-        byte_sequences: HashMap<usize, Vec<u8>>,
+        byte_sequences: Vec<(usize, Vec<u8>)>,
         scan_entropy: bool,
         average_entropy: f64,
     ) {
@@ -94,7 +94,7 @@ impl Pattern {
     ) {
         let mut first_byte_sequence_pass = true;
 
-        let mut common_byte_sequences = HashMap::new();
+        let mut common_byte_sequences = Vec::<(usize, Vec<u8>)>::new();
         let mut all_strings = Vec::new();
         let mut entropy = HashMap::new();
 
@@ -116,7 +116,7 @@ impl Pattern {
             // On the first pass, we simply set the matching sequence as the entire byte block.
             // This will get trimmed down and split into sections over future loop iterations.
             if scan_bytes && first_byte_sequence_pass {
-                common_byte_sequences.insert(0, chunk);
+                common_byte_sequences.push((0, chunk));
                 first_byte_sequence_pass = false;
                 continue;
             }
@@ -142,7 +142,7 @@ impl Pattern {
 
         // Add the computed information into the struct.
         self.data.scan_strings = scan_strings;
-        self.data.string_patterns = HashSet::from_iter(common_strings);
+        self.data.string_patterns = common_strings;
         self.data.scan_byte_sequences = scan_bytes;
         self.data.byte_sequences = common_byte_sequences;
         self.data.scan_entropy = scan_entropy;
@@ -163,7 +163,7 @@ impl Pattern {
         let mut points = 0.0;
 
         if self.data.scan_byte_sequences {
-            for sequence in self.data.byte_sequences.values() {
+            for (_, sequence) in &self.data.byte_sequences {
                 points += sequence.len() as f64;
             }
         }
@@ -188,6 +188,11 @@ impl Pattern {
         let rounded_points = points.round() as usize;
         self.max_points = Some(rounded_points);
         rounded_points
+    }
+
+    pub fn get_pattern_file_name(&self) -> String {
+        let file_name = utils::remove_invalid_file_name(&self.type_data.name);
+        file_name.replace(" ", "-") + ".json"
     }
 }
 
@@ -222,7 +227,7 @@ pub struct PatternData {
     ///
     /// # Notes
     /// Byte sequence matches are not optional - a missing sequence will result in a no-match.
-    pub byte_sequences: HashMap<usize, Vec<u8>>,
+    pub byte_sequences: Vec<(usize, Vec<u8>)>,
     /// Should we scan the file's entropy?
     pub scan_entropy: bool,
     /// The average entropy for this file type.
@@ -277,10 +282,7 @@ impl Default for PatternSubmitterData {
 #[cfg(test)]
 mod tests_pattern {
     use core::str;
-    use std::{
-        collections::{HashMap, HashSet},
-        path::Path,
-    };
+    use std::{collections::HashSet, path::Path};
 
     use crate::{file_processor::ASCII_CHARACTER_STRING, utils};
 
@@ -369,9 +371,9 @@ mod tests_pattern {
         // Basic match, two files both completely matching.
         let pattern = build_test("byte_sequences", "1", false, true, false);
 
-        let expected_set = HashMap::from([(0, (*b"abcdefghijk").to_vec())]);
+        let expected_set = vec![(0, (*b"abcdefghijk").to_vec())];
 
-        assert_eq!(pattern.data.byte_sequences, expected_set,);
+        assert_eq!(pattern.data.byte_sequences, expected_set);
     }
 
     #[test]
@@ -379,7 +381,7 @@ mod tests_pattern {
         // Simple non-match, two files and none are matching.
         let pattern = build_test("byte_sequences", "2", false, true, false);
 
-        assert_eq!(pattern.data.byte_sequences, HashMap::new());
+        assert_eq!(pattern.data.byte_sequences, vec![]);
     }
 
     #[test]
@@ -387,9 +389,9 @@ mod tests_pattern {
         // Simple match, two sub-sequences matching.
         let pattern = build_test("byte_sequences", "3", false, true, false);
 
-        let expected_set = HashMap::from([(0, (*b"abcde").to_vec()), (6, (*b"ghijk").to_vec())]);
+        let expected_set = vec![(0, (*b"abcde").to_vec()), (6, (*b"ghijk").to_vec())];
 
-        assert_eq!(pattern.data.byte_sequences, expected_set,);
+        assert_eq!(pattern.data.byte_sequences, expected_set);
     }
 
     #[test]
@@ -397,9 +399,9 @@ mod tests_pattern {
         // Single match, the end of the sequence is offset and so won't match.
         let pattern = build_test("byte_sequences", "4", false, true, false);
 
-        let expected_set = HashMap::from([(0, (*b"abcde").to_vec())]);
+        let expected_set = vec![(0, (*b"abcde").to_vec())];
 
-        assert_eq!(pattern.data.byte_sequences, expected_set,);
+        assert_eq!(pattern.data.byte_sequences, expected_set);
     }
 
     #[test]
@@ -407,7 +409,7 @@ mod tests_pattern {
         // No matches.
         let pattern = build_test("byte_sequences", "5", false, true, false);
 
-        assert_eq!(pattern.data.byte_sequences, HashMap::new(),);
+        assert_eq!(pattern.data.byte_sequences, vec![]);
     }
 
     #[test]
@@ -416,12 +418,12 @@ mod tests_pattern {
         // exceed the maximum then it will get split into two segments.
         let pattern = build_test("byte_sequences", "6", false, true, false);
 
-        let expected_set = HashMap::from([
+        let expected_set = vec![
             (0, "abcdefghijkŠaŠ".as_bytes().to_vec()),
             (16, "123456".as_bytes().to_vec()),
-        ]);
+        ];
 
-        assert_eq!(pattern.data.byte_sequences, expected_set,);
+        assert_eq!(pattern.data.byte_sequences, expected_set);
     }
 
     #[test]
@@ -429,12 +431,12 @@ mod tests_pattern {
         // Split match, two substrings will be returned.
         let pattern = build_test("byte_sequences", "7", false, true, false);
 
-        let expected_set = HashMap::from([
+        let expected_set = vec![
             (13, "a".as_bytes().to_vec()),
             (16, "123456".as_bytes().to_vec()),
-        ]);
+        ];
 
-        assert_eq!(pattern.data.byte_sequences, expected_set,);
+        assert_eq!(pattern.data.byte_sequences, expected_set);
     }
 
     #[test]
@@ -442,9 +444,9 @@ mod tests_pattern {
         // Single match at the very end.
         let pattern = build_test("byte_sequences", "8", false, true, false);
 
-        let expected_set = HashMap::from([(10, "k".as_bytes().to_vec())]);
+        let expected_set = vec![(10, "k".as_bytes().to_vec())];
 
-        assert_eq!(pattern.data.byte_sequences, expected_set,);
+        assert_eq!(pattern.data.byte_sequences, expected_set);
     }
 
     #[test]
