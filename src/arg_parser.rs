@@ -31,10 +31,12 @@ impl From<&[String]> for ArgParser {
             }
 
             if (lower_arg == "--identify" || lower_arg == "-i") && next_index < value.len() {
+                // TODO - validate path.
                 identify_file_path = &value[i + 1];
             }
 
             if (lower_arg == "--pattern" || lower_arg == "-p") && next_index < value.len() {
+                // TODO - validate path.
                 pattern_target_folder = &value[i + 1];
             }
 
