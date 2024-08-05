@@ -7,10 +7,7 @@ use std::{
     path::PathBuf,
 };
 
-use crate::{
-    file_point_calculator::{self, FilePointCalculator, FILE_EXTENSION_POINTS},
-    file_processor, utils,
-};
+use crate::{file_processor, utils};
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
 pub struct Pattern {

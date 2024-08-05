@@ -1,10 +1,12 @@
-pub mod file_point_calculator;
-pub mod file_processor;
-pub mod pattern;
-pub mod utils;
+mod arg_parser;
+mod file_point_calculator;
+mod file_processor;
+mod pattern;
+mod utils;
 
 use std::{env, time::Instant};
 
+use arg_parser::ArgParser;
 use file_point_calculator::FilePointCalculator;
 use pattern::Pattern;
 
@@ -13,19 +15,12 @@ const VERBOSE: bool = false;
 fn main() {
     let args: Vec<String> = env::args().collect();
 
-    let mut user_name = "";
-    let mut user_email = "";
+    let arg_handler = ArgParser::from(&args[..]);
+    println!("{arg_handler:?}");
+    return;
 
-    for (i, arg) in args.iter().enumerate() {
-        let next_index = i + 1;
-        if (arg == "--user" || arg == "-u") && next_index < args.len() {
-            user_name = &args[i + 1];
-        }
-
-        if (arg == "--email" || arg == "-e") && next_index < args.len() {
-            user_email = &args[i + 1];
-        }
-    }
+    let user_name = "";
+    let user_email = "";
 
     let splitter = "-".repeat(54);
     let half_splitter = "-".repeat(27);
