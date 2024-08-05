@@ -1,3 +1,5 @@
+use crate::utils;
+
 #[derive(Debug)]
 pub struct ArgParser {
     pub user_name: String,
@@ -5,7 +7,6 @@ pub struct ArgParser {
     pub identify_file_path: String,
     pub pattern_target_folder: String,
     pub pattern_target_extension: String,
-    pub pattern_target_recursive: bool,
     pub help: bool,
 }
 
@@ -16,7 +17,6 @@ impl From<&[String]> for ArgParser {
         let mut identify_file_path = "";
         let mut pattern_target_folder = "";
         let mut pattern_target_extension = "";
-        let mut pattern_target_recursive = true;
         let mut help = false;
 
         for (i, arg) in value.iter().enumerate() {
@@ -31,21 +31,29 @@ impl From<&[String]> for ArgParser {
             }
 
             if (lower_arg == "--identify" || lower_arg == "-i") && next_index < value.len() {
-                // TODO - validate path.
-                identify_file_path = &value[i + 1];
+                let temp = &value[i + 1];
+
+                if !utils::file_exists(temp) {
+                    println!("Error - the specified identify target path doesn't exist: '{temp}'.");
+                } else {
+                    identify_file_path = temp;
+                }
             }
 
             if (lower_arg == "--pattern" || lower_arg == "-p") && next_index < value.len() {
-                // TODO - validate path.
-                pattern_target_folder = &value[i + 1];
+                let temp = &value[i + 1];
+
+                if !utils::directory_exists(temp) {
+                    println!(
+                        "Error - the specified pattern target directory doesn't exist: '{temp}'."
+                    );
+                } else {
+                    pattern_target_folder = &value[i + 1];
+                }
             }
 
             if (lower_arg == "--extension" || lower_arg == "-e") && next_index < value.len() {
                 pattern_target_extension = &value[i + 1];
-            }
-
-            if lower_arg == "--no-recursive" || lower_arg == "-nr" {
-                pattern_target_recursive = true;
             }
 
             if lower_arg == "--help" || lower_arg == "-h" {
@@ -59,7 +67,6 @@ impl From<&[String]> for ArgParser {
             identify_file_path: identify_file_path.to_string(),
             pattern_target_folder: pattern_target_folder.to_string(),
             pattern_target_extension: pattern_target_extension.to_string(),
-            pattern_target_recursive,
             help,
         }
     }

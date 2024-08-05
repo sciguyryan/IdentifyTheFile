@@ -1,7 +1,14 @@
 use rand::Rng;
 use std::{collections::HashMap, path::Path};
-
 use walkdir::WalkDir;
+
+pub fn directory_exists<P: AsRef<Path>>(path: P) -> bool {
+    path.as_ref().exists() && path.as_ref().is_dir()
+}
+
+pub fn file_exists<P: AsRef<Path>>(path: P) -> bool {
+    path.as_ref().exists() && path.as_ref().is_file()
+}
 
 pub fn get_file_extension<P: AsRef<Path>>(path: P) -> String {
     // Get the file extension, if it exists.
