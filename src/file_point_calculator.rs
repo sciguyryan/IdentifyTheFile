@@ -3,11 +3,7 @@ use std::collections::HashMap;
 use crate::{file_processor, pattern::Pattern, utils};
 
 /// The maximum number of points to be awarded for entropy matching.
-pub const MAX_ENTROPY_POINTS: f64 = 25.0;
-/// The minimum percentage deviation to be used in the entropy points calculation.
-const MIN_DEVIATION_PERCENT: f64 = 1.0;
-/// The maximum percentage deviation to be used in the entropy points calculation.
-const MAX_DEVIATION_PERCENT: f64 = 100.0;
+pub const MAX_ENTROPY_POINTS: f64 = 20.0;
 /// The amount by which the total file count will be scaled to create the confidence factor.
 pub const CONFIDENCE_SCALE_FACTOR: f64 = 1.0 / 3.0;
 /// The number of points to be awarded for a file extension match.
@@ -19,6 +15,9 @@ pub struct FilePointCalculator {}
 impl FilePointCalculator {
     pub fn compute(pattern: &Pattern, path: &str) -> usize {
         let chunk = file_processor::read_file_header_chunk(path).expect("failed to read file");
+
+        let mut frequencies = HashMap::new();
+        file_processor::count_byte_frequencies(&chunk, &mut frequencies);
 
         let mut points = 0.0;
 
@@ -37,8 +36,8 @@ impl FilePointCalculator {
             points += Self::test_file_strings(pattern, &chunk);
         }
 
-        if pattern.data.scan_entropy {
-            points += Self::test_entropy_deviation(pattern, &chunk);
+        if pattern.data.scan_byte_distribution {
+            points += Self::test_entropy_deviation(pattern, &frequencies);
         }
 
         // Scale the relevant points by the confidence factor derived from the total files scanned.
@@ -68,7 +67,7 @@ impl FilePointCalculator {
             }
         }
 
-        if pattern.data.scan_entropy {
+        if pattern.data.scan_byte_distribution {
             points += MAX_ENTROPY_POINTS;
         }
 
@@ -79,7 +78,7 @@ impl FilePointCalculator {
         // of scanned files.
         points += FILE_EXTENSION_POINTS;
 
-        points.round() as usize
+        points.ceil() as usize
     }
 
     pub fn get_confidence_factor(pattern: &Pattern) -> f64 {
@@ -110,41 +109,26 @@ impl FilePointCalculator {
         points
     }
 
-    pub fn test_entropy_deviation(pattern: &Pattern, bytes: &[u8]) -> f64 {
+    pub fn test_entropy_deviation(pattern: &Pattern, frequencies: &HashMap<u8, usize>) -> f64 {
         let reference_entropy = pattern.data.get_entropy();
-        if !pattern.data.scan_entropy || reference_entropy == 0.0 {
+        if !pattern.data.scan_byte_distribution || reference_entropy == 0.0 {
             return MAX_ENTROPY_POINTS;
         }
 
         // Compute the entropy for the target block.
-        let mut frequencies = HashMap::new();
-        file_processor::count_byte_frequencies(bytes, &mut frequencies);
-        let target_entropy = file_processor::calculate_shannon_entropy(&frequencies);
-
-        // Round the target and reference entropy to 3 decimal places.
-        // Due to the complexities of working with floats, this ensures our results should be
-        // relatively consistent.
-        let rounded_reference_entropy = utils::round_to_dp(reference_entropy, 3);
-        let rounded_target_entropy = utils::round_to_dp(target_entropy, 3);
+        let target_entropy = utils::calculate_shannon_entropy(frequencies);
 
         // Calculate the absolute percentage deviation.
-        let deviation_percentage = ((rounded_target_entropy - rounded_reference_entropy).abs()
-            / rounded_reference_entropy)
-            * 100.0;
-        if deviation_percentage >= MAX_DEVIATION_PERCENT {
-            // If deviation is 100% or more, award a score of 0.
-            return 0.0;
-        }
+        let absolute_diff = (reference_entropy - target_entropy).abs();
+        let average_value = (reference_entropy + target_entropy) / 2.0;
+        let percentage_diff = if average_value != 0.0 {
+            (absolute_diff / average_value) * 100.0
+        } else {
+            0.0
+        };
 
-        if deviation_percentage <= MIN_DEVIATION_PERCENT {
-            return MAX_ENTROPY_POINTS;
-        }
-
-        // Calculate the score linearly between 0 and MAX_ENTROPY_POINTS.
-        MAX_ENTROPY_POINTS
-            * (1.0
-                - (deviation_percentage - MIN_DEVIATION_PERCENT)
-                    / (MAX_DEVIATION_PERCENT - MIN_DEVIATION_PERCENT))
+        // Scale the points linearly between 0 and MAX_ENTROPY_POINTS based on the differences.
+        MAX_ENTROPY_POINTS * (1.0 - percentage_diff)
     }
 
     pub fn test_file_extension(pattern: &Pattern, path: &str) -> f64 {

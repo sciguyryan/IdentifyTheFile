@@ -47,16 +47,18 @@ pub fn make_uuid() -> String {
     )
 }
 
-pub fn merge_hashmaps(maps: Vec<&HashMap<u8, usize>>) -> HashMap<u8, usize> {
-    let mut result = HashMap::new();
+pub fn calculate_shannon_entropy(frequencies: &HashMap<u8, usize>) -> f64 {
+    // Calculate the total frequency sum.
+    let total_bytes = frequencies.values().sum::<usize>() as f64;
 
-    for map in maps {
-        for (key, value) in map {
-            *result.entry(*key).or_insert(0) += value;
-        }
+    // Compute the entropy.
+    let mut entropy = 0.0;
+    for &count in frequencies.values() {
+        let probability = count as f64 / total_bytes;
+        entropy -= probability * probability.log2();
     }
 
-    result
+    entropy
 }
 
 pub fn print_byte_sequence_matches(sequences: &[(usize, Vec<u8>)]) {

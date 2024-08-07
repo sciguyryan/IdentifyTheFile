@@ -46,20 +46,6 @@ fn all_substrings_over_min_size(string: &str) -> Vec<&str> {
     substrings
 }
 
-pub fn calculate_shannon_entropy(frequencies: &HashMap<u8, usize>) -> f64 {
-    // Calculate the total frequency sum.
-    let total_bytes = frequencies.values().sum::<usize>() as f64;
-
-    // Compute the entropy.
-    let mut entropy = 0.0;
-    for &count in frequencies.values() {
-        let probability = count as f64 / total_bytes;
-        entropy -= probability * probability.log2();
-    }
-
-    entropy
-}
-
 pub fn common_string_sieve(hashsets: &mut Vec<HashSet<String>>) -> HashSet<String> {
     if hashsets.is_empty() {
         return HashSet::new();

@@ -49,26 +49,20 @@ impl Pattern {
         scan_byte_sequences: bool,
         byte_sequences: Vec<(usize, Vec<u8>)>,
         scan_entropy: bool,
-        average_entropy: f64,
     ) {
         self.data = PatternData {
             scan_strings,
             string_patterns,
             scan_byte_sequences,
             byte_sequences,
-            scan_entropy,
-            average_entropy,
-        }
+            scan_byte_distribution: scan_entropy,
+            average_entropy: 0.0,
+        };
     }
 
-    pub fn add_other_data(
-        &mut self,
-        total_scanned_files: usize,
-        entropy_bytes: HashMap<u8, usize>,
-    ) {
+    pub fn add_other_data(&mut self, total_scanned_files: usize) {
         self.other_data = PatternOtherData {
             total_scanned_files,
-            entropy_bytes,
         };
     }
 
@@ -87,14 +81,14 @@ impl Pattern {
         source_directory: &str,
         target_extension: &str,
         scan_strings: bool,
-        scan_bytes: bool,
-        scan_entropy: bool,
+        scan_byte_sequences: bool,
+        scan_byte_distribution: bool,
     ) {
         let mut first_byte_sequence_pass = true;
 
         let mut common_byte_sequences = Vec::<(usize, Vec<u8>)>::new();
         let mut all_strings = Vec::new();
-        let mut entropy = HashMap::new();
+        let mut byte_distribution = HashMap::new();
 
         let files = utils::list_files_of_type(source_directory, target_extension);
         for file_path in &files {
@@ -102,8 +96,8 @@ impl Pattern {
             let chunk =
                 file_processor::read_file_header_chunk(file_path).expect("failed to read file");
 
-            if scan_entropy {
-                file_processor::count_byte_frequencies(&chunk, &mut entropy);
+            if scan_byte_distribution {
+                file_processor::count_byte_frequencies(&chunk, &mut byte_distribution);
             }
 
             if scan_strings {
@@ -113,18 +107,18 @@ impl Pattern {
 
             // On the first pass, we simply set the matching sequence as the entire byte block.
             // This will get trimmed down and split into sections over future loop iterations.
-            if scan_bytes && first_byte_sequence_pass {
+            if scan_byte_sequences && first_byte_sequence_pass {
                 common_byte_sequences.push((0, chunk));
                 first_byte_sequence_pass = false;
                 continue;
             }
 
-            if scan_bytes {
+            if scan_byte_sequences {
                 file_processor::refine_common_byte_sequences_v2(&chunk, &mut common_byte_sequences);
             }
         }
 
-        if scan_bytes {
+        if scan_byte_sequences {
             file_processor::strip_unwanted_sequences(&mut common_byte_sequences);
 
             // Sort the sequence, to make it prettier.
@@ -137,21 +131,18 @@ impl Pattern {
             common_strings = file_processor::common_string_sieve(&mut all_strings);
         }
 
-        // Compute the new average file entropy.
-        let merged_entropy_bytes =
-            utils::merge_hashmaps(vec![&self.other_data.entropy_bytes, &entropy]);
+        if scan_byte_distribution {
+            self.data.average_entropy = utils::calculate_shannon_entropy(&byte_distribution);
+        }
 
         // Add the computed information into the struct.
         self.data.scan_strings = scan_strings;
         self.data.string_patterns = common_strings;
-        self.data.scan_byte_sequences = scan_bytes;
+        self.data.scan_byte_sequences = scan_byte_sequences;
         self.data.byte_sequences = common_byte_sequences;
-        self.data.scan_entropy = scan_entropy;
-        self.data.average_entropy =
-            file_processor::calculate_shannon_entropy(&merged_entropy_bytes);
+        self.data.scan_byte_distribution = scan_byte_distribution;
 
         self.other_data.total_scanned_files += files.len();
-        self.other_data.entropy_bytes = merged_entropy_bytes;
     }
 
     fn get_pattern_file_name(&self) -> String {
@@ -202,10 +193,10 @@ pub struct PatternData {
     /// # Notes
     /// Byte sequence matches are not optional - a missing sequence will result in a no-match.
     pub byte_sequences: Vec<(usize, Vec<u8>)>,
-    /// Should we scan the file's entropy?
-    pub scan_entropy: bool,
+    /// Should we scan various aspects of the file's byte distribution?
+    pub scan_byte_distribution: bool,
     /// The average entropy for this file type.
-    /// This will be zero if entropy scanning is disabled.
+    /// This will be zero if byte distribution scanning is disabled.
     ///
     /// # Notes
     /// Entropy will be evaluated based by its percentage of deviation from the stored average.
@@ -223,8 +214,6 @@ pub struct PatternOtherData {
     /// The total number of files that have been scanned to build this pattern.
     /// Refinements to the pattern will add to this total.
     pub total_scanned_files: usize,
-    /// The raw byte entropy counts, stored for refinement purposes.
-    pub entropy_bytes: HashMap<u8, usize>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
