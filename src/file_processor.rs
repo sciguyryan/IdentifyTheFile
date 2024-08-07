@@ -208,10 +208,6 @@ pub fn generate_file_string_hashset(bytes: &[u8]) -> HashSet<String> {
     string_map
 }
 
-fn process_files(directory: &str, target_extension: &str) -> Pattern {
-    Pattern::default()
-}
-
 fn largest_common_substring<'a>(str_1: &'a str, str_2: &str) -> Option<&'a str> {
     let mut str_1_substrings = all_substrings_over_min_size(str_1);
     str_1_substrings.sort_unstable_by_key(|b| std::cmp::Reverse(b.len()));

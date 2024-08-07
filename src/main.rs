@@ -1,26 +1,99 @@
-mod arg_parser;
 mod file_point_calculator;
 mod file_processor;
 mod pattern;
 mod utils;
 
+use clap::{Parser, Subcommand};
 use std::{collections::HashMap, env, time::Instant};
 
-use arg_parser::ArgParser;
 use file_point_calculator::FilePointCalculator;
 use pattern::Pattern;
+
+#[derive(Parser)]
+#[command(
+    name = "IdentifyTheFile",
+    about = "A CLI application designed to identify files or build patterns to aid with the identification."
+)]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    Identify {
+        #[arg(value_name = "FILE")]
+        file: String,
+    },
+    Pattern {
+        #[arg(short, long, default_value = "")]
+        user_name: String,
+
+        #[arg(short, long, default_value = "")]
+        email: String,
+
+        #[arg(short, long, default_value = "")]
+        name: String,
+
+        #[arg(short, long, default_value = "")]
+        description: String,
+
+        #[arg(short, long, default_value = "")]
+        extensions: String,
+
+        #[arg(short, long, default_value = "")]
+        mimetypes: String,
+
+        #[arg(value_name = "EXT")]
+        extension: String,
+
+        #[arg(value_name = "PATH")]
+        path: String,
+
+        #[arg(value_name = "OUTPUT_PATH")]
+        output_path: Option<String>,
+    },
+}
 
 const VERBOSE: bool = true;
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
+    let cli = Cli::parse();
 
-    let arg_handler = ArgParser::from(&args[..]);
-    //println!("{arg_handler:?}");
-    //return;
+    match &cli.command {
+        Commands::Identify { file } => {
+            if !utils::file_exists(file) {
+                eprintln!("The specified file path '{file}' doesn't exist.");
+                return;
+            }
+            println!("Identifying file: {}", file);
+            // Add logic for identifying the file
+        }
+        Commands::Pattern {
+            user_name,
+            email,
+            name,
+            description,
+            extensions,
+            mimetypes,
+            extension,
+            path,
+            output_path,
+        } => {
+            if !utils::directory_exists(path) {
+                eprintln!("The specified target folder '{path}' doesn't exist.");
+                return;
+            }
 
-    let user_name = "";
-    let user_email = "";
+            let mut pattern = Pattern::new(name, description, vec![], vec![]);
+            pattern.build_patterns_from_data(path, extension, true, true, true);
+
+            let json = serde_json::to_string(&pattern).expect("");
+            println!("{json}");
+        }
+    }
+
+    return;
 
     let splitter = "-".repeat(54);
     let half_splitter = "-".repeat(27);
@@ -33,7 +106,7 @@ fn main() {
 
     let processing_start = Instant::now();
 
-    let mut pattern = Pattern::new("test waffles", "test", vec!["mkv".to_string()], vec![]);
+    /*let mut pattern = Pattern::new("test waffles", "test", vec!["mkv".to_string()], vec![]);
     pattern.build_patterns_from_data(
         pattern_target_directory,
         pattern_target_extension,
@@ -146,5 +219,5 @@ fn main() {
         println!("\x1b[92mSuccessfully matched all applicable strings!\x1b[0m");
     } else {
         println!("\x1b[91mFailed to match one or more strings!\x1b[0m");
-    }
+    }*/
 }
