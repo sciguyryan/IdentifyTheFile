@@ -84,6 +84,12 @@ fn main() {
                 return;
             }
 
+            let extension = extension.trim_start_matches('.');
+            if extension.is_empty() {
+                eprintln!("The target extension may not be empty.");
+                return;
+            }
+
             let mut pattern = Pattern::new(name, description, vec![], vec![]);
             pattern.build_patterns_from_data(path, extension, true, true, true);
 

@@ -61,6 +61,7 @@ pub fn calculate_shannon_entropy(frequencies: &HashMap<u8, usize>) -> f64 {
     entropy
 }
 
+#[allow(unused)]
 pub fn print_byte_sequence_matches(sequences: &[(usize, Vec<u8>)]) {
     let mut vec = sequences.to_vec().clone();
     vec.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());

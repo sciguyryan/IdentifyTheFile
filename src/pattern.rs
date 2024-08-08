@@ -242,6 +242,12 @@ impl Default for PatternSubmitterData {
     }
 }
 
+pub fn from_simd_json_str(input: &str) -> Result<Pattern, Box<dyn std::error::Error>> {
+    let mut json_bytes = input.as_bytes().to_vec();
+    let p: Pattern = simd_json::from_slice(&mut json_bytes[..])?;
+    Ok(p)
+}
+
 #[cfg(test)]
 mod tests_pattern {
     use core::str;
