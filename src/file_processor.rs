@@ -6,8 +6,6 @@ use std::{
     sync::OnceLock,
 };
 
-use crate::pattern::Pattern;
-
 pub const ASCII_CHARACTER_STRING: &str =
     " !#$+,-./0123456789<=>?ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz";
 pub static ASCII_READABLE_CHARACTERS: OnceLock<Vec<u8>> = OnceLock::new();

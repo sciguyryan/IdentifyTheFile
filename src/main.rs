@@ -4,15 +4,14 @@ mod pattern;
 mod utils;
 
 use clap::{Parser, Subcommand};
-use std::{collections::HashMap, env, time::Instant};
+use std::time::Instant;
 
-use file_point_calculator::FilePointCalculator;
 use pattern::Pattern;
 
 #[derive(Parser)]
 #[command(
-    name = "IdentifyTheFile",
-    about = "A CLI application designed to identify files or build patterns to aid with the identification."
+    name = "Identify The File",
+    about = "A CLI application designed to identify files or build patterns to aid with file type identification."
 )]
 struct Cli {
     #[command(subcommand)]

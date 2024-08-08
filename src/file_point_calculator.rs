@@ -110,13 +110,13 @@ impl FilePointCalculator {
     }
 
     pub fn test_entropy_deviation(pattern: &Pattern, frequencies: &HashMap<u8, usize>) -> f64 {
-        let reference_entropy = pattern.data.get_entropy();
+        let reference_entropy = utils::round_to_dp(pattern.data.get_entropy(), 3);
         if !pattern.data.scan_byte_distribution || reference_entropy == 0.0 {
             return MAX_ENTROPY_POINTS;
         }
 
-        // Compute the entropy for the target block.
-        let target_entropy = utils::calculate_shannon_entropy(frequencies);
+        // Compute the entropy for the target data block.
+        let target_entropy = utils::round_to_dp(utils::calculate_shannon_entropy(frequencies), 3);
 
         // Calculate the absolute percentage deviation.
         let absolute_diff = (reference_entropy - target_entropy).abs();
