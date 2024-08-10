@@ -365,7 +365,7 @@ mod tests_pattern {
         // Simple match, two sub-sequences matching.
         let pattern = build_test("byte_sequences", "3", false, true, false);
 
-        let expected_set = vec![(0, (*b"abcde").to_vec()), (6, (*b"ghijk").to_vec())];
+        let expected_set = vec![(6, (*b"ghijk").to_vec()), (0, (*b"abcde").to_vec())];
 
         assert_eq!(pattern.data.byte_sequences, expected_set);
     }
@@ -395,8 +395,8 @@ mod tests_pattern {
         let pattern = build_test("byte_sequences", "6", false, true, false);
 
         let expected_set = vec![
-            (0, "abcdefghijkŠaŠ".as_bytes().to_vec()),
             (16, "123456".as_bytes().to_vec()),
+            (0, "abcdefghijkŠaŠ".as_bytes().to_vec()),
         ];
 
         assert_eq!(pattern.data.byte_sequences, expected_set);
@@ -408,8 +408,8 @@ mod tests_pattern {
         let pattern = build_test("byte_sequences", "7", false, true, false);
 
         let expected_set = vec![
-            (13, "a".as_bytes().to_vec()),
             (16, "123456".as_bytes().to_vec()),
+            (13, "a".as_bytes().to_vec()),
         ];
 
         assert_eq!(pattern.data.byte_sequences, expected_set);
