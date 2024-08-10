@@ -19,7 +19,10 @@ pub fn get_file_extension<P: AsRef<Path>>(path: P) -> String {
     }
 }
 
-pub fn list_files_of_type(source_directory: &str, target_extension: &str) -> Vec<String> {
+pub fn list_files_of_type<P: AsRef<Path>>(
+    source_directory: P,
+    target_extension: &str,
+) -> Vec<String> {
     WalkDir::new(source_directory)
         .into_iter()
         .filter_map(Result::ok)
