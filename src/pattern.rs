@@ -55,7 +55,7 @@ impl Pattern {
             string_patterns,
             scan_byte_sequences,
             byte_sequences,
-            scan_byte_distribution: scan_entropy,
+            scan_file_composition: scan_entropy,
             average_entropy: 0.0,
         };
     }
@@ -121,8 +121,13 @@ impl Pattern {
         if scan_byte_sequences {
             file_processor::strip_unwanted_sequences(&mut common_byte_sequences);
 
-            // Sort the sequence, to make it prettier.
-            common_byte_sequences.sort_by(|a, b| a.0.cmp(&b.0));
+            /*
+             * Sort by the start position of the sequence, descending first.
+             * This is done because the testing loop will bail if the start index is
+             * beyond the bounds of the array. This could be an asset when testing
+             * lots of smaller files.
+             */
+            common_byte_sequences.sort_unstable_by(|a, b| b.0.cmp(&a.0));
         }
 
         // Sieve the strings to retain only the common ones.
@@ -140,7 +145,7 @@ impl Pattern {
         self.data.string_patterns = common_strings;
         self.data.scan_byte_sequences = scan_byte_sequences;
         self.data.byte_sequences = common_byte_sequences;
-        self.data.scan_byte_distribution = scan_byte_distribution;
+        self.data.scan_file_composition = scan_byte_distribution;
 
         self.other_data.total_scanned_files += files.len();
     }
@@ -168,8 +173,10 @@ pub struct PatternTypeData {
     /// The description of this file type.
     pub description: String,
     /// Any known extensions for this file type.
+    #[serde(rename(serialize = "extensions", deserialize = "extensions"))]
     pub known_extensions: Vec<String>,
     /// Any known mimetypes for this file type.
+    #[serde(rename(serialize = "mimetypes", deserialize = "mimetypes"))]
     pub known_mimetypes: Vec<String>,
     /// The UUID of the pattern file.
     pub uuid: String,
@@ -193,8 +200,8 @@ pub struct PatternData {
     /// # Notes
     /// Byte sequence matches are not optional - a missing sequence will result in a no-match.
     pub byte_sequences: Vec<(usize, Vec<u8>)>,
-    /// Should we scan various aspects of the file's byte distribution?
-    pub scan_byte_distribution: bool,
+    /// Should we scan various aspects of the file's composition?
+    pub scan_file_composition: bool,
     /// The average entropy for this file type.
     /// This will be zero if byte distribution scanning is disabled.
     ///

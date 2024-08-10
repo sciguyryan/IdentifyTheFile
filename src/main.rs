@@ -4,7 +4,11 @@ mod pattern;
 mod utils;
 
 use clap::{Parser, Subcommand};
-use std::time::Instant;
+use std::{
+    fs::File,
+    io::{self, Write},
+    time::Instant,
+};
 
 use pattern::Pattern;
 
@@ -13,6 +17,9 @@ use pattern::Pattern;
     name = "Identify The File",
     about = "A CLI application designed to identify files or build patterns to aid with file type identification."
 )]
+#[command(name = "example")]
+#[command(version = "1.0")]
+#[command(author = "sciguyryan <sciguyryan@gmail.com>")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -38,10 +45,19 @@ enum Commands {
         description: String,
 
         #[arg(short, long, default_value = "")]
-        extensions: String,
+        known_extensions: String,
 
         #[arg(short, long, default_value = "")]
         mimetypes: String,
+
+        #[arg(long, default_value_t = false)]
+        no_strings: bool,
+
+        #[arg(long, default_value_t = false)]
+        no_sequences: bool,
+
+        #[arg(long, default_value_t = false)]
+        no_composition: bool,
 
         #[arg(value_name = "EXT")]
         extension: String,
@@ -65,7 +81,7 @@ fn main() {
                 eprintln!("The specified file path '{file}' doesn't exist.");
                 return;
             }
-            println!("Identifying file: {}", file);
+            println!("Identifying file: {file}");
             // Add logic for identifying the file
         }
         Commands::Pattern {
@@ -73,8 +89,11 @@ fn main() {
             email,
             name,
             description,
-            extensions,
+            known_extensions,
             mimetypes,
+            no_strings,
+            no_sequences,
+            no_composition,
             extension,
             path,
             output_path,
@@ -90,11 +109,74 @@ fn main() {
                 return;
             }
 
-            let mut pattern = Pattern::new(name, description, vec![], vec![]);
-            pattern.build_patterns_from_data(path, extension, true, true, true);
+            if *no_strings && *no_sequences && *no_composition {
+                eprintln!("No pattern matching options were enabled, therefore no pattern can be created.");
+                return;
+            }
+
+            let mut extensions: Vec<String> = if known_extensions.is_empty() {
+                vec![]
+            } else {
+                known_extensions
+                    .split(',')
+                    .collect::<Vec<&str>>()
+                    .iter()
+                    .map(|s| s.to_uppercase())
+                    .collect()
+            };
+
+            let upper_ext = extension.to_uppercase();
+            if !extensions.contains(&upper_ext) {
+                extensions.push(upper_ext);
+            }
+
+            let mimetypes: Vec<String> = if mimetypes.is_empty() {
+                vec![]
+            } else {
+                mimetypes
+                    .split(',')
+                    .collect::<Vec<&str>>()
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect()
+            };
+
+            let mut pattern = Pattern::new(name, description, extensions, mimetypes);
+            pattern.add_submitter_data(user_name, email);
+            pattern.build_patterns_from_data(
+                path,
+                extension,
+                !*no_strings,
+                !*no_sequences,
+                !*no_composition,
+            );
 
             let json = serde_json::to_string(&pattern).expect("");
-            println!("{json}");
+
+            if let Some(p) = output_path {
+                if utils::file_exists(p) {
+                    println!(
+                        "A file already exists at the path {p}. Would you like to overwrite it?"
+                    );
+                    io::stdout().flush().unwrap();
+
+                    let mut response = String::new();
+                    io::stdin()
+                        .read_line(&mut response)
+                        .expect("failed to read line");
+
+                    let response = response.trim_start().to_lowercase();
+                    if !response.starts_with('y') {
+                        return;
+                    }
+                }
+
+                let mut file = File::create(p).expect("failed to open the file for writing");
+                file.write_all(json.as_bytes())
+                    .expect("failed to write file contents");
+            } else {
+                println!("{json}");
+            }
         }
     }
 

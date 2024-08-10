@@ -36,7 +36,7 @@ impl FilePointCalculator {
             points += Self::test_file_strings(pattern, &chunk);
         }
 
-        if pattern.data.scan_byte_distribution {
+        if pattern.data.scan_file_composition {
             points += Self::test_entropy_deviation(pattern, &frequencies);
         }
 
@@ -67,7 +67,7 @@ impl FilePointCalculator {
             }
         }
 
-        if pattern.data.scan_byte_distribution {
+        if pattern.data.scan_file_composition {
             points += MAX_ENTROPY_POINTS;
         }
 
@@ -111,7 +111,7 @@ impl FilePointCalculator {
 
     pub fn test_entropy_deviation(pattern: &Pattern, frequencies: &HashMap<u8, usize>) -> f64 {
         let reference_entropy = utils::round_to_dp(pattern.data.get_entropy(), 3);
-        if !pattern.data.scan_byte_distribution || reference_entropy == 0.0 {
+        if !pattern.data.scan_file_composition || reference_entropy == 0.0 {
             return MAX_ENTROPY_POINTS;
         }
 
