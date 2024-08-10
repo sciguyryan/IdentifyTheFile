@@ -2,6 +2,21 @@ use rand::Rng;
 use std::{collections::HashMap, path::Path};
 use walkdir::WalkDir;
 
+#[inline(always)]
+pub fn calculate_shannon_entropy(frequencies: &HashMap<u8, usize>) -> f64 {
+    // Calculate the total number of bytes in our sample.
+    let total_bytes = frequencies.values().sum::<usize>() as f64;
+
+    // Compute the entropy.
+    let mut entropy = 0.0;
+    for count in frequencies.values() {
+        let probability = *count as f64 / total_bytes;
+        entropy -= probability * probability.log2();
+    }
+
+    entropy
+}
+
 pub fn directory_exists<P: AsRef<Path>>(path: P) -> bool {
     path.as_ref().exists() && path.as_ref().is_dir()
 }
@@ -37,7 +52,7 @@ pub fn make_uuid() -> String {
     let random: u128 = rand::thread_rng().gen();
 
     // Format the value as a hex string with zero padding to ensure it has 32 characters.
-    let hex = format!("{:032x}", random);
+    let hex = format!("{random:032x}");
 
     // Split the string into parts and insert dashes according to UUID format.
     format!(
@@ -48,20 +63,6 @@ pub fn make_uuid() -> String {
         &hex[16..20],
         &hex[20..32]
     )
-}
-
-pub fn calculate_shannon_entropy(frequencies: &HashMap<u8, usize>) -> f64 {
-    // Calculate the total frequency sum.
-    let total_bytes = frequencies.values().sum::<usize>() as f64;
-
-    // Compute the entropy.
-    let mut entropy = 0.0;
-    for &count in frequencies.values() {
-        let probability = count as f64 / total_bytes;
-        entropy -= probability * probability.log2();
-    }
-
-    entropy
 }
 
 #[allow(unused)]
@@ -82,6 +83,6 @@ const UNIX_INVALID_CHARS: &str = "/";
 pub fn remove_invalid_file_name(file_name: &str) -> String {
     file_name
         .chars()
-        .filter(|c| !NTFS_INVALID_CHARS.contains(*c) && !UNIX_INVALID_CHARS.contains(*c))
+        .filter(|&c| !NTFS_INVALID_CHARS.contains(c) && !UNIX_INVALID_CHARS.contains(c))
         .collect()
 }

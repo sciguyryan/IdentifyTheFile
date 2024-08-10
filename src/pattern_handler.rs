@@ -14,13 +14,9 @@ impl PatternHandler {
     pub fn read<P: AsRef<Path>>(&mut self, path: P, target_pattern: &str) {
         let files = utils::list_files_of_type(path, "json");
 
-        // Load every pattern.
+        // Load every pattern, or the specific pattern if a target has been specified.
         for f in &files {
-            if !target_pattern.is_empty() {
-                if f.contains(target_pattern) {
-                    self.read_parse_pattern(f);
-                }
-            } else {
+            if target_pattern.is_empty() || f.contains(target_pattern) {
                 self.read_parse_pattern(f);
             }
         }

@@ -21,7 +21,7 @@ impl FilePointCalculator {
 
         let mut points = 0.0;
 
-        if pattern.data.scan_byte_sequences {
+        if pattern.data.scan_sequences {
             points += Self::test_byte_sequence(pattern, &chunk);
 
             // Byte sequence matches, if specified, MUST exist for a match to be valid at all.
@@ -36,7 +36,7 @@ impl FilePointCalculator {
             points += Self::test_file_strings(pattern, &chunk);
         }
 
-        if pattern.data.scan_file_composition {
+        if pattern.data.scan_composition {
             points += Self::test_entropy_deviation(pattern, &frequencies);
         }
 
@@ -55,19 +55,19 @@ impl FilePointCalculator {
     pub fn compute_max_points(pattern: &Pattern) -> usize {
         let mut points = 0.0;
 
-        if pattern.data.scan_byte_sequences {
-            for (_, sequence) in &pattern.data.byte_sequences {
+        if pattern.data.scan_sequences {
+            for (_, sequence) in &pattern.data.sequences {
                 points += sequence.len() as f64;
             }
         }
 
         if pattern.data.scan_strings {
-            for string in &pattern.data.string_patterns {
+            for string in &pattern.data.strings {
                 points += string.len() as f64;
             }
         }
 
-        if pattern.data.scan_file_composition {
+        if pattern.data.scan_composition {
             points += MAX_ENTROPY_POINTS;
         }
 
@@ -86,12 +86,12 @@ impl FilePointCalculator {
     }
 
     pub fn test_byte_sequence(pattern: &Pattern, bytes: &[u8]) -> f64 {
-        if !pattern.data.scan_byte_sequences || pattern.data.byte_sequences.is_empty() {
+        if !pattern.data.scan_sequences || pattern.data.sequences.is_empty() {
             return 0.0;
         }
 
         let mut points = 0.0;
-        for (start, sequence) in &pattern.data.byte_sequences {
+        for (start, sequence) in &pattern.data.sequences {
             let end = *start + sequence.len();
             if *start > bytes.len() || end > bytes.len() {
                 points = 0.0;
@@ -110,8 +110,8 @@ impl FilePointCalculator {
     }
 
     pub fn test_entropy_deviation(pattern: &Pattern, frequencies: &HashMap<u8, usize>) -> f64 {
-        let reference_entropy = utils::round_to_dp(pattern.data.get_entropy(), 3);
-        if !pattern.data.scan_file_composition || reference_entropy == 0.0 {
+        let reference_entropy = utils::round_to_dp(pattern.data.average_entropy, 3);
+        if !pattern.data.scan_composition || reference_entropy == 0.0 {
             return MAX_ENTROPY_POINTS;
         }
 
@@ -142,14 +142,14 @@ impl FilePointCalculator {
     }
 
     pub fn test_file_strings(pattern: &Pattern, bytes: &[u8]) -> f64 {
-        if !pattern.data.scan_strings || pattern.data.string_patterns.is_empty() {
+        if !pattern.data.scan_strings || pattern.data.strings.is_empty() {
             return 0.0;
         }
 
         let strings = file_processor::generate_file_string_hashset(bytes);
 
         let mut points = 0.0;
-        for str in &pattern.data.string_patterns {
+        for str in &pattern.data.strings {
             if strings.contains(str) {
                 points += str.len() as f64;
             }

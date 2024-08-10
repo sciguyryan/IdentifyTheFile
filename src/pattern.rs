@@ -12,12 +12,16 @@ use crate::{file_processor, utils};
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
 pub struct Pattern {
     /// The basic pattern information.
+    #[serde(rename = "td")]
     pub type_data: PatternTypeData,
     /// The pattern data to be used when performing a scan.
+    #[serde(rename = "pd")]
     pub data: PatternData,
     /// Any other data that may be associated with the pattern.
+    #[serde(rename = "od")]
     pub other_data: PatternOtherData,
     /// The submitter information, if specified.
+    #[serde(rename = "sd")]
     pub submitter_data: PatternSubmitterData,
 }
 
@@ -40,30 +44,6 @@ impl Pattern {
             other_data: PatternOtherData::default(),
             submitter_data: PatternSubmitterData::default(),
         }
-    }
-
-    pub fn add_pattern_data(
-        &mut self,
-        scan_strings: bool,
-        string_patterns: HashSet<String>,
-        scan_byte_sequences: bool,
-        byte_sequences: Vec<(usize, Vec<u8>)>,
-        scan_entropy: bool,
-    ) {
-        self.data = PatternData {
-            scan_strings,
-            string_patterns,
-            scan_byte_sequences,
-            byte_sequences,
-            scan_file_composition: scan_entropy,
-            average_entropy: 0.0,
-        };
-    }
-
-    pub fn add_other_data(&mut self, total_scanned_files: usize) {
-        self.other_data = PatternOtherData {
-            total_scanned_files,
-        };
     }
 
     pub fn add_submitter_data(&mut self, scanned_by: &str, scanned_by_email: &str) {
@@ -142,10 +122,10 @@ impl Pattern {
 
         // Add the computed information into the struct.
         self.data.scan_strings = scan_strings;
-        self.data.string_patterns = common_strings;
-        self.data.scan_byte_sequences = scan_byte_sequences;
-        self.data.byte_sequences = common_byte_sequences;
-        self.data.scan_file_composition = scan_byte_distribution;
+        self.data.strings = common_strings;
+        self.data.scan_sequences = scan_byte_sequences;
+        self.data.sequences = common_byte_sequences;
+        self.data.scan_composition = scan_byte_distribution;
 
         self.other_data.total_scanned_files += files.len();
     }
@@ -173,10 +153,8 @@ pub struct PatternTypeData {
     /// The description of this file type.
     pub description: String,
     /// Any known extensions for this file type.
-    #[serde(rename(serialize = "extensions", deserialize = "extensions"))]
     pub known_extensions: Vec<String>,
     /// Any known mimetypes for this file type.
-    #[serde(rename(serialize = "mimetypes", deserialize = "mimetypes"))]
     pub known_mimetypes: Vec<String>,
     /// The UUID of the pattern file.
     pub uuid: String,
@@ -191,36 +169,32 @@ pub struct PatternData {
     ///
     /// # Notes
     /// String matches are optional and a missing string will not render the match void.
-    pub string_patterns: HashSet<String>,
+    pub strings: HashSet<String>,
     /// Should we scan for byte sequences?
-    pub scan_byte_sequences: bool,
+    pub scan_sequences: bool,
     /// Any positional byte sequences that may be associated with this file type.
     /// This field will be empty if byte sequence scanning is disabled.
     ///
     /// # Notes
     /// Byte sequence matches are not optional - a missing sequence will result in a no-match.
-    pub byte_sequences: Vec<(usize, Vec<u8>)>,
+    pub sequences: Vec<(usize, Vec<u8>)>,
     /// Should we scan various aspects of the file's composition?
-    pub scan_file_composition: bool,
+    pub scan_composition: bool,
     /// The average entropy for this file type.
     /// This will be zero if byte distribution scanning is disabled.
     ///
     /// # Notes
     /// Entropy will be evaluated based by its percentage of deviation from the stored average.
-    average_entropy: f64,
+    pub average_entropy: f64,
 }
 
-impl PatternData {
-    pub fn get_entropy(&self) -> f64 {
-        utils::round_to_dp(self.average_entropy, 3)
-    }
-}
-
-#[derive(Clone, Default, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct PatternOtherData {
     /// The total number of files that have been scanned to build this pattern.
     /// Refinements to the pattern will add to this total.
     pub total_scanned_files: usize,
+    /// A URL documenting the file format.
+    pub file_format_url: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -271,7 +245,7 @@ mod tests_pattern {
 
         let set = HashSet::from(["ABCDEFGHIJK".to_string()]);
 
-        assert_eq!(pattern.data.string_patterns, set,);
+        assert_eq!(pattern.data.strings, set,);
     }
 
     #[test]
@@ -279,7 +253,7 @@ mod tests_pattern {
         // Simple non-match, two files and none are matching.
         let pattern = build_test("strings", "2", true, false, false);
 
-        assert!(pattern.data.string_patterns.is_empty());
+        assert!(pattern.data.strings.is_empty());
     }
 
     #[test]
@@ -289,7 +263,7 @@ mod tests_pattern {
 
         let set = HashSet::from(["ABCDE".to_string()]);
 
-        assert_eq!(pattern.data.string_patterns, set,);
+        assert_eq!(pattern.data.strings, set,);
     }
 
     #[test]
@@ -299,7 +273,7 @@ mod tests_pattern {
 
         let set = HashSet::from(["ABCDE".to_string(), "GHIJK".to_string()]);
 
-        assert_eq!(pattern.data.string_patterns, set,);
+        assert_eq!(pattern.data.strings, set,);
     }
 
     #[test]
@@ -309,7 +283,7 @@ mod tests_pattern {
 
         let set = HashSet::from(["GHIJK".to_string()]);
 
-        assert_eq!(pattern.data.string_patterns, set,);
+        assert_eq!(pattern.data.strings, set,);
     }
 
     #[test]
@@ -319,7 +293,7 @@ mod tests_pattern {
 
         let set = HashSet::from(["ABCDEFGHIJK".to_string(), "123456".to_string()]);
 
-        assert_eq!(pattern.data.string_patterns, set,);
+        assert_eq!(pattern.data.strings, set,);
     }
 
     #[test]
@@ -329,7 +303,7 @@ mod tests_pattern {
 
         let set = HashSet::from(["123456".to_string()]);
 
-        assert_eq!(pattern.data.string_patterns, set,);
+        assert_eq!(pattern.data.strings, set,);
     }
 
     #[test]
@@ -339,7 +313,7 @@ mod tests_pattern {
 
         let set = HashSet::from([ASCII_CHARACTER_STRING.to_ascii_uppercase()]);
 
-        assert_eq!(pattern.data.string_patterns, set,);
+        assert_eq!(pattern.data.strings, set,);
     }
 
     #[test]
@@ -349,7 +323,7 @@ mod tests_pattern {
 
         let expected_set = vec![(0, (*b"abcdefghijk").to_vec())];
 
-        assert_eq!(pattern.data.byte_sequences, expected_set);
+        assert_eq!(pattern.data.sequences, expected_set);
     }
 
     #[test]
@@ -357,7 +331,7 @@ mod tests_pattern {
         // Simple non-match, two files and none are matching.
         let pattern = build_test("byte_sequences", "2", false, true, false);
 
-        assert_eq!(pattern.data.byte_sequences, vec![]);
+        assert_eq!(pattern.data.sequences, vec![]);
     }
 
     #[test]
@@ -367,7 +341,7 @@ mod tests_pattern {
 
         let expected_set = vec![(6, (*b"ghijk").to_vec()), (0, (*b"abcde").to_vec())];
 
-        assert_eq!(pattern.data.byte_sequences, expected_set);
+        assert_eq!(pattern.data.sequences, expected_set);
     }
 
     #[test]
@@ -377,7 +351,7 @@ mod tests_pattern {
 
         let expected_set = vec![(0, (*b"abcde").to_vec())];
 
-        assert_eq!(pattern.data.byte_sequences, expected_set);
+        assert_eq!(pattern.data.sequences, expected_set);
     }
 
     #[test]
@@ -385,7 +359,7 @@ mod tests_pattern {
         // No matches.
         let pattern = build_test("byte_sequences", "5", false, true, false);
 
-        assert_eq!(pattern.data.byte_sequences, vec![]);
+        assert_eq!(pattern.data.sequences, vec![]);
     }
 
     #[test]
@@ -399,7 +373,7 @@ mod tests_pattern {
             (0, "abcdefghijkŠaŠ".as_bytes().to_vec()),
         ];
 
-        assert_eq!(pattern.data.byte_sequences, expected_set);
+        assert_eq!(pattern.data.sequences, expected_set);
     }
 
     #[test]
@@ -412,7 +386,7 @@ mod tests_pattern {
             (13, "a".as_bytes().to_vec()),
         ];
 
-        assert_eq!(pattern.data.byte_sequences, expected_set);
+        assert_eq!(pattern.data.sequences, expected_set);
     }
 
     #[test]
@@ -422,7 +396,7 @@ mod tests_pattern {
 
         let expected_set = vec![(10, "k".as_bytes().to_vec())];
 
-        assert_eq!(pattern.data.byte_sequences, expected_set);
+        assert_eq!(pattern.data.sequences, expected_set);
     }
 
     #[test]
@@ -432,7 +406,7 @@ mod tests_pattern {
 
         let expected_set = vec![(0, "abcdefghijk".as_bytes().to_vec())];
 
-        assert_eq!(pattern.data.byte_sequences, expected_set);
+        assert_eq!(pattern.data.sequences, expected_set);
     }
 
     #[test]
