@@ -9,8 +9,12 @@ pub fn calculate_shannon_entropy(frequencies: &HashMap<u8, usize>) -> f64 {
 
     // Compute the entropy.
     let mut entropy = 0.0;
-    for count in frequencies.values() {
-        let probability = *count as f64 / total_bytes;
+    for &count in frequencies.values() {
+        if count == 0 {
+            continue;
+        }
+
+        let probability = count as f64 / total_bytes;
         entropy -= probability * probability.log2();
     }
 

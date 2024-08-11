@@ -127,7 +127,7 @@ impl Pattern {
         self.data.sequences = common_byte_sequences;
         self.data.scan_composition = scan_byte_distribution;
 
-        self.other_data.total_scanned_files += files.len();
+        self.other_data.total_scanned_files = files.len();
     }
 
     fn get_pattern_file_name(&self) -> String {
