@@ -153,8 +153,10 @@ pub struct PatternTypeData {
     /// The description of this file type.
     pub description: String,
     /// Any known extensions for this file type.
+    #[serde(rename = "extensions")]
     pub known_extensions: Vec<String>,
     /// Any known mimetypes for this file type.
+    #[serde(rename = "minetypes")]
     pub known_mimetypes: Vec<String>,
     /// The UUID of the pattern file.
     pub uuid: String,

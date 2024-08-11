@@ -78,7 +78,7 @@ fn main() {
     /*let json =
         std::fs::read_to_string("D:\\Storage\\File Type Samples\\patterns\\matroska.json").unwrap();
     let pattern = pattern::from_simd_json_str(&json).unwrap();
-    let fpc = FilePointCalculator::compute(
+    let fpc = file_point_calculator::FilePointCalculator::compute(
         &pattern,
         "D:\\Storage\\File Type Samples\\samples\\mkv\\The World in HDR.mkv",
     );
