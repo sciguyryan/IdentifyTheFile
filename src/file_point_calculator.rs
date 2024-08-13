@@ -20,12 +20,14 @@ impl FilePointCalculator {
         let mut points = 0.0;
 
         if pattern.data.scan_sequences {
-            points += Self::test_byte_sequence(pattern, chunk);
+            let (p, success) = Self::test_byte_sequences(pattern, chunk);
 
             // Byte sequence matches, if specified, MUST exist for a match to be valid at all.
             // If the points returned are zero, the file cannot be a match.
             // These should be tested before the strings and entropy.
-            if points == 0.0 {
+            if success {
+                points += p;
+            } else {
                 return 0;
             }
         }
@@ -83,28 +85,26 @@ impl FilePointCalculator {
         (pattern.other_data.total_scanned_files as f64).powf(CONFIDENCE_SCALE_FACTOR)
     }
 
-    pub fn test_byte_sequence(pattern: &Pattern, bytes: &[u8]) -> f64 {
+    pub fn test_byte_sequences(pattern: &Pattern, bytes: &[u8]) -> (f64, bool) {
         if !pattern.data.scan_sequences || pattern.data.sequences.is_empty() {
-            return 0.0;
+            return (0.0, true);
         }
 
         let mut points = 0.0;
         for (start, sequence) in &pattern.data.sequences {
             let end = *start + sequence.len();
             if *start > bytes.len() || end > bytes.len() {
-                points = 0.0;
-                break;
+                return (0.0, false);
             }
 
             if sequence != &bytes[*start..end] {
-                points = 0.0;
-                break;
+                return (0.0, false);
             } else {
                 points += sequence.len() as f64;
             }
         }
 
-        points
+        (points, true)
     }
 
     pub fn test_entropy_deviation(pattern: &Pattern, frequencies: &HashMap<u8, usize>) -> f64 {
