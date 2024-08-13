@@ -10,10 +10,6 @@ pub fn calculate_shannon_entropy(frequencies: &HashMap<u8, usize>) -> f64 {
     // Compute the entropy.
     let mut entropy = 0.0;
     for &count in frequencies.values() {
-        if count == 0 {
-            continue;
-        }
-
         let probability = count as f64 / total_bytes;
         entropy -= probability * probability.log2();
     }
@@ -22,11 +18,11 @@ pub fn calculate_shannon_entropy(frequencies: &HashMap<u8, usize>) -> f64 {
 }
 
 pub fn directory_exists<P: AsRef<Path>>(path: P) -> bool {
-    path.as_ref().exists() && path.as_ref().is_dir()
+    path.as_ref().is_dir()
 }
 
 pub fn file_exists<P: AsRef<Path>>(path: P) -> bool {
-    path.as_ref().exists() && path.as_ref().is_file()
+    path.as_ref().is_file()
 }
 
 pub fn get_file_extension<P: AsRef<Path>>(path: P) -> String {

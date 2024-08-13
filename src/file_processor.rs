@@ -116,10 +116,6 @@ pub fn common_string_sieve(hashsets: &mut Vec<HashSet<String>>) -> HashSet<Strin
 }
 
 pub fn count_byte_frequencies(data: &[u8], frequencies: &mut HashMap<u8, usize>) {
-    for i in 0..255 {
-        frequencies.insert(i, 0);
-    }
-
     for b in data {
         *frequencies.entry(*b).or_insert(0) += 1;
     }

@@ -5,7 +5,9 @@ mod pattern_handler;
 mod utils;
 
 use clap::{Parser, Subcommand};
+use file_point_calculator::FilePointCalculator;
 use pattern_handler::PatternHandler;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use std::{env, path::PathBuf};
 
 use pattern::Pattern;
@@ -30,6 +32,9 @@ enum Commands {
 
         #[arg(short, long, default_value = "", value_name = "example.mkv.json")]
         target_pattern: String,
+
+        #[arg(short, long, default_value_t = -1)]
+        result_count: i32,
 
         #[arg(value_name = "FILE")]
         file: String,
@@ -91,6 +96,7 @@ fn main() {
         Commands::Identify {
             source_directory: _,
             target_pattern: _,
+            result_count: _,
             file: _,
         } => {
             process_identify_command(&cli.command);
@@ -121,6 +127,7 @@ fn process_identify_command(cmd: &Commands) {
     if let Commands::Identify {
         source_directory,
         target_pattern,
+        result_count,
         file,
     } = cmd
     {
@@ -157,8 +164,66 @@ fn process_identify_command(cmd: &Commands) {
             return;
         }
 
-        // Add logic for identifying the file.
-        println!("identify the file here...");
+        let mut results = handle_matching(&pattern_handler, file);
+
+        // Sort the results, descending.
+        results.sort_unstable_by(|a, b| b.percentage.partial_cmp(&a.percentage).unwrap());
+
+        // Only retail a set number of results, if specified.
+        if *result_count != -1 {
+            results.truncate(*result_count as usize);
+        }
+
+        // TODO - provide a better output than this...
+        for points in &results {
+            println!(
+                "uuid: {}, points: {}, max_points: {}, percentage: {}",
+                points.uuid, points.points, points.max_points, points.percentage
+            )
+        }
+    }
+}
+
+#[inline]
+fn handle_matching<'a>(pattern_handler: &'a PatternHandler, path: &str) -> Vec<PatternMatch<'a>> {
+    let chunk = file_processor::read_file_header_chunk(path).expect("failed to read sample file");
+
+    let point_store: Vec<PatternMatch> = pattern_handler
+        .patterns
+        .par_iter()
+        .filter_map(|pattern| {
+            let points = FilePointCalculator::compute(pattern, &chunk, path);
+            if points > 0 {
+                Some(PatternMatch::new(
+                    &pattern.type_data.uuid,
+                    points,
+                    FilePointCalculator::compute_max_points(pattern),
+                ))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    point_store
+}
+
+#[derive(Debug)]
+struct PatternMatch<'a> {
+    pub uuid: &'a str,
+    pub points: usize,
+    pub max_points: usize,
+    pub percentage: f64,
+}
+
+impl<'a> PatternMatch<'a> {
+    pub fn new(uuid: &'a str, points: usize, max_points: usize) -> Self {
+        Self {
+            uuid,
+            points,
+            max_points,
+            percentage: utils::round_to_dp(points as f64 / max_points as f64 * 100.0, 1),
+        }
     }
 }
 

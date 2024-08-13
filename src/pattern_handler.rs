@@ -7,7 +7,7 @@ use crate::{
 
 #[derive(Default)]
 pub struct PatternHandler {
-    patterns: Vec<Pattern>,
+    pub patterns: Vec<Pattern>,
 }
 
 impl PatternHandler {

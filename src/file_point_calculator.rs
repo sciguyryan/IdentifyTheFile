@@ -13,16 +13,14 @@ pub const FILE_EXTENSION_POINTS: f64 = 5.0;
 pub struct FilePointCalculator {}
 
 impl FilePointCalculator {
-    pub fn compute(pattern: &Pattern, path: &str) -> usize {
-        let chunk = file_processor::read_file_header_chunk(path).expect("failed to read file");
-
+    pub fn compute(pattern: &Pattern, chunk: &[u8], path: &str) -> usize {
         let mut frequencies = HashMap::new();
-        file_processor::count_byte_frequencies(&chunk, &mut frequencies);
+        file_processor::count_byte_frequencies(chunk, &mut frequencies);
 
         let mut points = 0.0;
 
         if pattern.data.scan_sequences {
-            points += Self::test_byte_sequence(pattern, &chunk);
+            points += Self::test_byte_sequence(pattern, chunk);
 
             // Byte sequence matches, if specified, MUST exist for a match to be valid at all.
             // If the points returned are zero, the file cannot be a match.
@@ -33,7 +31,7 @@ impl FilePointCalculator {
         }
 
         if pattern.data.scan_strings {
-            points += Self::test_file_strings(pattern, &chunk);
+            points += Self::test_file_strings(pattern, chunk);
         }
 
         if pattern.data.scan_composition {
@@ -48,6 +46,12 @@ impl FilePointCalculator {
         points += Self::test_file_extension(pattern, path);
 
         points.round() as usize
+    }
+
+    pub fn compute_from_path(pattern: &Pattern, path: &str) -> usize {
+        let chunk = file_processor::read_file_header_chunk(path).expect("failed to read file");
+
+        Self::compute(pattern, &chunk, path)
     }
 
     /// Computer the maximum number of points that can be awarded for a perfect match against this pattern.
@@ -110,13 +114,13 @@ impl FilePointCalculator {
     }
 
     pub fn test_entropy_deviation(pattern: &Pattern, frequencies: &HashMap<u8, usize>) -> f64 {
-        let reference_entropy = utils::round_to_dp(pattern.data.average_entropy, 3);
+        let reference_entropy = pattern.data.average_entropy;
         if !pattern.data.scan_composition || reference_entropy == 0.0 {
             return MAX_ENTROPY_POINTS;
         }
 
         // Compute the entropy for the target data block.
-        let target_entropy = utils::round_to_dp(utils::calculate_shannon_entropy(frequencies), 3);
+        let target_entropy = utils::calculate_shannon_entropy(frequencies);
 
         // Calculate the absolute percentage deviation.
         let absolute_diff = (reference_entropy - target_entropy).abs();
@@ -128,7 +132,7 @@ impl FilePointCalculator {
         };
 
         // Scale the points linearly between 0 and MAX_ENTROPY_POINTS based on the differences.
-        MAX_ENTROPY_POINTS * (1.0 - percentage_diff)
+        MAX_ENTROPY_POINTS * (1.0 - percentage_diff / 100.0)
     }
 
     pub fn test_file_extension(pattern: &Pattern, path: &str) -> f64 {
