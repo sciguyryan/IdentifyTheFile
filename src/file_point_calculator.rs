@@ -48,12 +48,6 @@ impl FilePointCalculator {
         points.round() as usize
     }
 
-    pub fn compute_from_path(pattern: &Pattern, path: &str) -> usize {
-        let chunk = file_processor::read_file_header_chunk(path).expect("failed to read file");
-
-        Self::compute(pattern, &chunk, path)
-    }
-
     /// Computer the maximum number of points that can be awarded for a perfect match against this pattern.
     /// The more detailed the pattern, the higher the total points available.
     pub fn compute_max_points(pattern: &Pattern) -> usize {
