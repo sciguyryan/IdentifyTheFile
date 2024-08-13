@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use crate::{file_processor, pattern::Pattern, utils};
 
 /// The maximum number of points to be awarded for entropy matching.
@@ -14,8 +12,11 @@ pub struct FilePointCalculator {}
 
 impl FilePointCalculator {
     pub fn compute(pattern: &Pattern, chunk: &[u8], path: &str) -> usize {
-        let mut frequencies = HashMap::new();
-        file_processor::count_byte_frequencies(chunk, &mut frequencies);
+        let mut frequencies = [0; 256];
+
+        if pattern.data.scan_sequences || pattern.data.scan_composition {
+            file_processor::count_byte_frequencies(chunk, &mut frequencies);
+        }
 
         let mut points = 0.0;
 
@@ -41,7 +42,7 @@ impl FilePointCalculator {
         }
 
         // Scale the relevant points by the confidence factor derived from the total files scanned.
-        points *= Self::get_confidence_factor(pattern);
+        points *= pattern.confidence_factor;
 
         // The file extension is considered a separate factor and doesn't scale with the number
         // of scanned files.
@@ -50,64 +51,39 @@ impl FilePointCalculator {
         points.round() as usize
     }
 
-    /// Computer the maximum number of points that can be awarded for a perfect match against this pattern.
-    /// The more detailed the pattern, the higher the total points available.
-    pub fn compute_max_points(pattern: &Pattern) -> usize {
-        let mut points = 0.0;
-
-        if pattern.data.scan_sequences {
-            for (_, sequence) in &pattern.data.sequences {
-                points += sequence.len() as f64;
-            }
-        }
-
-        if pattern.data.scan_strings {
-            for string in &pattern.data.strings {
-                points += string.len() as f64;
-            }
-        }
-
-        if pattern.data.scan_composition {
-            points += MAX_ENTROPY_POINTS;
-        }
-
-        // Scale the relevant points by the confidence factor derived from the total files scanned.
-        points *= Self::get_confidence_factor(pattern);
-
-        // The file extension is considered a separate factor and doesn't scale with the number
-        // of scanned files.
-        points += FILE_EXTENSION_POINTS;
-
-        points.ceil() as usize
-    }
-
-    pub fn get_confidence_factor(pattern: &Pattern) -> f64 {
-        (pattern.other_data.total_scanned_files as f64).powf(CONFIDENCE_SCALE_FACTOR)
-    }
-
+    #[inline(always)]
     pub fn test_byte_sequences(pattern: &Pattern, bytes: &[u8]) -> (f64, bool) {
         if !pattern.data.scan_sequences || pattern.data.sequences.is_empty() {
             return (0.0, true);
         }
 
+        // By default, sequences are sorted by their starting index - largest first.
+        // This means that the one with the largest position will be first.
+        // In the best case, it might be outside the bounds of the file, thereby
+        // letting is bail the loop early. Though this is likely something that will
+        // only come up with small files.
         let mut points = 0.0;
         for (start, sequence) in &pattern.data.sequences {
-            let end = *start + sequence.len();
+            let len = sequence.len();
+            let end = *start + len;
             if *start > bytes.len() || end > bytes.len() {
                 return (0.0, false);
             }
 
-            if sequence != &bytes[*start..end] {
-                return (0.0, false);
-            } else {
-                points += sequence.len() as f64;
+            unsafe {
+                if sequence != bytes.get_unchecked(*start..end) {
+                    return (0.0, false);
+                }
             }
+
+            points += len as f64;
         }
 
         (points, true)
     }
 
-    pub fn test_entropy_deviation(pattern: &Pattern, frequencies: &HashMap<u8, usize>) -> f64 {
+    #[inline(always)]
+    pub fn test_entropy_deviation(pattern: &Pattern, frequencies: &[usize; 256]) -> f64 {
         let reference_entropy = pattern.data.average_entropy;
         if !pattern.data.scan_composition || reference_entropy == 0.0 {
             return MAX_ENTROPY_POINTS;
@@ -115,12 +91,9 @@ impl FilePointCalculator {
 
         // Compute the entropy for the target data block.
         let target_entropy = utils::calculate_shannon_entropy(frequencies);
-
-        // Calculate the absolute percentage deviation.
         let absolute_diff = (reference_entropy - target_entropy).abs();
-        let average_value = (reference_entropy + target_entropy) / 2.0;
-        let percentage_diff = if average_value != 0.0 {
-            (absolute_diff / average_value) * 100.0
+        let percentage_diff = if reference_entropy > 0.0 {
+            (absolute_diff / reference_entropy) * 100.0
         } else {
             0.0
         };
@@ -129,6 +102,7 @@ impl FilePointCalculator {
         MAX_ENTROPY_POINTS * (1.0 - percentage_diff / 100.0)
     }
 
+    #[inline(always)]
     pub fn test_file_extension(pattern: &Pattern, path: &str) -> f64 {
         let ext = utils::get_file_extension(path);
 
@@ -139,6 +113,7 @@ impl FilePointCalculator {
         }
     }
 
+    #[inline(always)]
     pub fn test_file_strings(pattern: &Pattern, bytes: &[u8]) -> f64 {
         if !pattern.data.scan_strings || pattern.data.strings.is_empty() {
             return 0.0;
@@ -146,13 +121,12 @@ impl FilePointCalculator {
 
         let strings = file_processor::generate_file_string_hashset(bytes);
 
-        let mut points = 0.0;
-        for str in &pattern.data.strings {
-            if strings.contains(str) {
-                points += str.len() as f64;
-            }
-        }
-
-        points
+        pattern
+            .data
+            .strings
+            .iter()
+            .filter(|s| strings.contains(*s))
+            .map(|s| s.len() as f64)
+            .sum()
     }
 }

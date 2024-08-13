@@ -33,7 +33,8 @@ impl PatternHandler {
         file.read_to_string(&mut contents)
             .expect("failed to read file");
 
-        if let Ok(p) = pattern::from_simd_json_str(&contents) {
+        if let Ok(mut p) = pattern::from_simd_json_str(&contents) {
+            p.run_computations();
             self.patterns.push(p);
         }
     }

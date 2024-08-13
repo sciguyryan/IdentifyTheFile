@@ -28,7 +28,7 @@ struct Cli {
 enum Commands {
     Identify {
         #[arg(short, long, default_value = "", value_name = "DIR")]
-        source_directory: String,
+        pattern_source_dir: String,
 
         #[arg(short, long, default_value = "", value_name = "example.mkv.json")]
         target_pattern: String,
@@ -90,11 +90,31 @@ fn main() {
     println!("{}", fpc);
     return;*/
 
+    /*let files = utils::list_files_of_type("D:\\Downloads\\YouTube", "webm");
+
+    println!("{}", files.len());
+
+    use std::time::Instant;
+    let now = Instant::now();
+
+    for file in files {
+        process_identify_command(&Commands::Identify {
+            pattern_source_dir: "D:\\Storage\\File Type Samples\\patterns".to_string(),
+            target_pattern: "".to_string(),
+            result_count: -1,
+            file,
+        });
+    }
+
+    let elapsed = now.elapsed();
+    println!("Elapsed: {:.2?}", elapsed);
+    return;*/
+
     let cli = Cli::parse();
 
     match &cli.command {
         Commands::Identify {
-            source_directory: _,
+            pattern_source_dir: _,
             target_pattern: _,
             result_count: _,
             file: _,
@@ -125,7 +145,7 @@ fn main() {
 
 fn process_identify_command(cmd: &Commands) {
     if let Commands::Identify {
-        source_directory,
+        pattern_source_dir: source_directory,
         target_pattern,
         result_count,
         file,
@@ -137,20 +157,21 @@ fn process_identify_command(cmd: &Commands) {
         }
 
         let mut pattern_handler = PatternHandler::default();
-        let mut pattern_source = PathBuf::new();
 
         // By default we'll look at the path /patterns/ relative to the path of the executable.
         // If the source path is specified then we will attempt to load the patterns from there instead.
-        if source_directory.is_empty() {
+        let pattern_source = if source_directory.is_empty() {
             if let Ok(p) = env::current_dir() {
-                pattern_source = p.clone();
-                pattern_source.push("patterns");
+                let mut temp = p.clone();
+                temp.push("patterns");
+                temp
             } else {
                 eprintln!("Unable to get the current working directory, and no definition source specified. Unable to continue.");
+                return;
             }
         } else {
-            pattern_source = PathBuf::from(source_directory);
-        }
+            PathBuf::from(source_directory)
+        };
 
         if !utils::directory_exists(&pattern_source) {
             eprintln!("The specified pattern source directory doesn't exist. Unable to continue.");
@@ -158,7 +179,6 @@ fn process_identify_command(cmd: &Commands) {
         }
 
         pattern_handler.read(pattern_source, target_pattern);
-
         if pattern_handler.is_empty() {
             eprintln!("No applicable patterns were found. Unable to continue.");
             return;
@@ -176,10 +196,11 @@ fn process_identify_command(cmd: &Commands) {
 
         // TODO - provide a better output than this...
         for points in &results {
-            println!(
+            /*println!(
                 "uuid: {}, points: {}, max_points: {}, percentage: {}",
                 points.uuid, points.points, points.max_points, points.percentage
-            )
+            )*/
+            let aaaa = points.points * points.points;
         }
     }
 }
@@ -197,7 +218,7 @@ fn handle_matching<'a>(pattern_handler: &'a PatternHandler, path: &str) -> Vec<P
                 Some(PatternMatch::new(
                     &pattern.type_data.uuid,
                     points,
-                    FilePointCalculator::compute_max_points(pattern),
+                    pattern.max_points,
                 ))
             } else {
                 None

@@ -1,13 +1,11 @@
 use chrono::{DateTime, Utc};
 use serde_derive::{Deserialize, Serialize};
-use std::{
-    collections::{HashMap, HashSet},
-    fs::File,
-    io::Write,
-    path::PathBuf,
-};
+use std::{collections::HashSet, fs::File, io::Write, path::PathBuf};
 
-use crate::{file_processor, utils};
+use crate::{
+    file_point_calculator::{CONFIDENCE_SCALE_FACTOR, FILE_EXTENSION_POINTS, MAX_ENTROPY_POINTS},
+    file_processor, utils,
+};
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
 pub struct Pattern {
@@ -23,6 +21,12 @@ pub struct Pattern {
     /// The submitter information, if specified.
     #[serde(rename = "sd")]
     pub submitter_data: PatternSubmitterData,
+    // The maximum number of points that can be given by a match against this pattern.
+    #[serde(skip)]
+    pub max_points: usize,
+    /// The confidence factor, used in match point calculations.
+    #[serde(skip)]
+    pub confidence_factor: f64,
 }
 
 impl Pattern {
@@ -43,6 +47,8 @@ impl Pattern {
             data: PatternData::default(),
             other_data: PatternOtherData::default(),
             submitter_data: PatternSubmitterData::default(),
+            max_points: 0,
+            confidence_factor: 0.0,
         }
     }
 
@@ -68,7 +74,7 @@ impl Pattern {
 
         let mut common_byte_sequences = Vec::<(usize, Vec<u8>)>::new();
         let mut all_strings = Vec::new();
-        let mut byte_distribution = HashMap::new();
+        let mut byte_distribution: [usize; 256] = [0; 256];
 
         let files = utils::list_files_of_type(source_directory, target_extension);
         for file_path in &files {
@@ -107,7 +113,7 @@ impl Pattern {
              * beyond the bounds of the array. This could be an asset when testing
              * lots of smaller files.
              */
-            common_byte_sequences.sort_unstable_by(|a, b| b.0.cmp(&a.0));
+            common_byte_sequences.sort_unstable_by_key(|b| std::cmp::Reverse(b.0));
         }
 
         // Sieve the strings to retain only the common ones.
@@ -128,6 +134,47 @@ impl Pattern {
         self.data.scan_composition = scan_byte_distribution;
 
         self.other_data.total_scanned_files = files.len();
+    }
+
+    pub fn run_computations(&mut self) {
+        self.compute_confidence_factor();
+        self.compute_max_points();
+    }
+
+    fn compute_confidence_factor(&mut self) {
+        self.confidence_factor =
+            (self.other_data.total_scanned_files as f64).powf(CONFIDENCE_SCALE_FACTOR);
+    }
+
+    /// Computer the maximum number of points that can be awarded for a perfect match against this pattern.
+    /// The more detailed the pattern, the higher the total points available.
+    fn compute_max_points(&mut self) {
+        let mut points = 0.0;
+
+        if self.data.scan_sequences {
+            for (_, sequence) in &self.data.sequences {
+                points += sequence.len() as f64;
+            }
+        }
+
+        if self.data.scan_strings {
+            for string in &self.data.strings {
+                points += string.len() as f64;
+            }
+        }
+
+        if self.data.scan_composition {
+            points += MAX_ENTROPY_POINTS;
+        }
+
+        // Scale the relevant points by the confidence factor derived from the total files scanned.
+        points *= self.confidence_factor;
+
+        // The file extension is considered a separate factor and doesn't scale with the number
+        // of scanned files.
+        points += FILE_EXTENSION_POINTS;
+
+        self.max_points = points.ceil() as usize;
     }
 
     fn get_pattern_file_name(&self) -> String {

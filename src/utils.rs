@@ -1,15 +1,19 @@
 use rand::Rng;
-use std::{collections::HashMap, path::Path};
+use std::path::Path;
 use walkdir::WalkDir;
 
 #[inline(always)]
-pub fn calculate_shannon_entropy(frequencies: &HashMap<u8, usize>) -> f64 {
+pub fn calculate_shannon_entropy(frequencies: &[usize; 256]) -> f64 {
     // Calculate the total number of bytes in our sample.
-    let total_bytes = frequencies.values().sum::<usize>() as f64;
+    let total_bytes = frequencies.iter().sum::<usize>() as f64;
 
     // Compute the entropy.
     let mut entropy = 0.0;
-    for &count in frequencies.values() {
+    for &count in frequencies {
+        if count == 0 {
+            continue;
+        }
+
         let probability = count as f64 / total_bytes;
         entropy -= probability * probability.log2();
     }
