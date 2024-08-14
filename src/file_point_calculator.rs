@@ -3,7 +3,7 @@ use crate::{file_processor, pattern::Pattern, utils};
 /// The maximum number of points to be awarded for entropy matching.
 pub const MAX_ENTROPY_POINTS: f64 = 15.0;
 /// The amount by which the total file count will be scaled to create the confidence factor.
-pub const CONFIDENCE_SCALE_FACTOR: f64 = 1.0 / 5.0;
+pub const CONFIDENCE_SCALE_FACTOR: f64 = 1.0 / 3.0;
 /// The number of points to be awarded for a file extension match.
 pub const FILE_EXTENSION_POINTS: f64 = 5.0;
 

@@ -77,8 +77,12 @@ impl Pattern {
         let mut byte_distribution: [usize; 256] = [0; 256];
 
         let files = utils::list_files_of_type(source_directory, target_extension);
-        for file_path in &files {
-            // If we made it here then we have a valid file.
+
+        println!("Total files = {}", files.len());
+
+        for (i, file_path) in files.iter().enumerate() {
+            println!("Processing file {} of {}", i, files.len());
+
             let chunk =
                 file_processor::read_file_header_chunk(file_path).expect("failed to read file");
 

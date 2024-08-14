@@ -12,6 +12,7 @@ homepage = "https://github.com/sciguyryan/IdentifyTheFile"
 chrono = { version = "0.4.38", features = ["serde"] }
 clap = { version = "4.5.15", features = ["derive"] }
 hashbrown = "0.14.5"
+prettytable = "0.10.0"
 rand = "0.8.5"
 rayon = "1.10.0"
 serde = "1.0.206"

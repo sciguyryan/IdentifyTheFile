@@ -7,6 +7,7 @@ mod utils;
 use clap::{Parser, Subcommand};
 use file_point_calculator::FilePointCalculator;
 use pattern_handler::PatternHandler;
+use prettytable::{Cell, Row, Table};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use std::{env, path::PathBuf};
 
@@ -110,6 +111,14 @@ fn main() {
     println!("Elapsed: {:.2?}", elapsed);
     return;*/
 
+    /*process_identify_command(&Commands::Identify {
+        pattern_source_dir: "D:\\Storage\\File Type Samples\\patterns".to_string(),
+        target_pattern: "".to_string(),
+        result_count: -1,
+        file: "D:\\Storage\\File Type Samples\\samples\\webm\\6 - Windows PE File Format Explained [OkX2lIf9YEM].webm".to_string(),
+    });
+    return;*/
+
     let cli = Cli::parse();
 
     match &cli.command {
@@ -141,6 +150,89 @@ fn main() {
             todo!();
         }
     }
+}
+
+#[inline]
+fn match_patterns<'a>(pattern_handler: &'a PatternHandler, path: &str) -> Vec<PatternMatch<'a>> {
+    let chunk = file_processor::read_file_header_chunk(path).expect("failed to read sample file");
+
+    let point_store: Vec<PatternMatch> = pattern_handler
+        .patterns
+        .par_iter()
+        .filter_map(|pattern| {
+            let points = FilePointCalculator::compute(pattern, &chunk, path);
+            if points > 0 {
+                Some(PatternMatch::new(
+                    &pattern.type_data.uuid,
+                    points,
+                    pattern.max_points,
+                ))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    point_store
+}
+
+#[derive(Debug)]
+struct PatternMatch<'a> {
+    pub uuid: &'a str,
+    pub points: usize,
+    pub max_points: usize,
+    pub percentage: f64,
+}
+
+impl<'a> PatternMatch<'a> {
+    pub fn new(uuid: &'a str, points: usize, max_points: usize) -> Self {
+        Self {
+            uuid,
+            points,
+            max_points,
+            percentage: utils::round_to_dp(points as f64 / max_points as f64 * 100.0, 1),
+        }
+    }
+}
+
+fn print_results(results: &[PatternMatch], handler: &PatternHandler) {
+    let mut table = Table::new();
+
+    // Add a row for the header.
+    table.add_row(Row::new(vec![
+        Cell::new("Rank").style_spec("b"),
+        Cell::new("Name").style_spec("b"),
+        Cell::new("Points").style_spec("b"),
+        Cell::new("Max Points").style_spec("b"),
+        Cell::new("Percentage").style_spec("b"),
+    ]));
+
+    for (i, result) in results.iter().enumerate() {
+        let p = handler
+            .patterns
+            .iter()
+            .find(|pattern| pattern.type_data.uuid == result.uuid)
+            .unwrap();
+
+        // The values are rounded to 1 d.p., so we don't need to worry about the edge-case
+        // floating point issues.
+        let colour = match result.percentage {
+            0.0..=33.3 => "Fr",
+            33.4..=66.66 => "Fy",
+            66.67..=100.0 => "Fg",
+            _ => "Fw",
+        };
+
+        table.add_row(Row::new(vec![
+            Cell::new(&(i + 1).to_string()).style_spec(colour),
+            Cell::new(&p.type_data.name).style_spec(colour),
+            Cell::new(&result.points.to_string()).style_spec(colour),
+            Cell::new(&result.max_points.to_string()).style_spec(colour),
+            Cell::new(&result.percentage.to_string()).style_spec(colour),
+        ]));
+    }
+
+    table.printstd();
 }
 
 fn process_identify_command(cmd: &Commands) {
@@ -184,7 +276,7 @@ fn process_identify_command(cmd: &Commands) {
             return;
         }
 
-        let mut results = handle_matching(&pattern_handler, file);
+        let mut results = match_patterns(&pattern_handler, file);
 
         // Sort the results, descending.
         results.sort_unstable_by(|a, b| b.percentage.partial_cmp(&a.percentage).unwrap());
@@ -194,57 +286,7 @@ fn process_identify_command(cmd: &Commands) {
             results.truncate(*result_count as usize);
         }
 
-        // TODO - provide a better output than this...
-        for points in &results {
-            /*println!(
-                "uuid: {}, points: {}, max_points: {}, percentage: {}",
-                points.uuid, points.points, points.max_points, points.percentage
-            )*/
-            let aaaa = points.points * points.points;
-        }
-    }
-}
-
-#[inline]
-fn handle_matching<'a>(pattern_handler: &'a PatternHandler, path: &str) -> Vec<PatternMatch<'a>> {
-    let chunk = file_processor::read_file_header_chunk(path).expect("failed to read sample file");
-
-    let point_store: Vec<PatternMatch> = pattern_handler
-        .patterns
-        .par_iter()
-        .filter_map(|pattern| {
-            let points = FilePointCalculator::compute(pattern, &chunk, path);
-            if points > 0 {
-                Some(PatternMatch::new(
-                    &pattern.type_data.uuid,
-                    points,
-                    pattern.max_points,
-                ))
-            } else {
-                None
-            }
-        })
-        .collect();
-
-    point_store
-}
-
-#[derive(Debug)]
-struct PatternMatch<'a> {
-    pub uuid: &'a str,
-    pub points: usize,
-    pub max_points: usize,
-    pub percentage: f64,
-}
-
-impl<'a> PatternMatch<'a> {
-    pub fn new(uuid: &'a str, points: usize, max_points: usize) -> Self {
-        Self {
-            uuid,
-            points,
-            max_points,
-            percentage: utils::round_to_dp(points as f64 / max_points as f64 * 100.0, 1),
-        }
+        print_results(&results, &pattern_handler);
     }
 }
 
