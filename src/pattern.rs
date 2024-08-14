@@ -77,12 +77,7 @@ impl Pattern {
         let mut byte_distribution: [usize; 256] = [0; 256];
 
         let files = utils::list_files_of_type(source_directory, target_extension);
-
-        println!("Total files = {}", files.len());
-
-        for (i, file_path) in files.iter().enumerate() {
-            println!("Processing file {} of {}", i, files.len());
-
+        for file_path in &files {
             let chunk =
                 file_processor::read_file_header_chunk(file_path).expect("failed to read file");
 
@@ -186,14 +181,17 @@ impl Pattern {
         file_name.replace(" ", "-") + ".json"
     }
 
-    pub fn write(&self, path: &str) -> std::io::Result<()> {
+    pub fn write(&self, path: &str) -> std::io::Result<PathBuf> {
         let serialized = serde_json::to_string(self).unwrap();
 
         let mut path = PathBuf::from(path);
         path.push(self.get_pattern_file_name());
 
-        let mut output = File::create(path)?;
-        write!(output, "{serialized}")
+        let mut output = File::create(&path)?;
+        match write!(output, "{serialized}") {
+            Ok(_) => Ok(path),
+            Err(e) => Err(e),
+        }
     }
 }
 
@@ -285,9 +283,9 @@ pub fn from_simd_json_str(input: &str) -> Result<Pattern, Box<dyn std::error::Er
 #[cfg(test)]
 mod tests_pattern {
     use core::str;
-    use std::{collections::HashSet, path::Path};
+    use std::collections::HashSet;
 
-    use crate::{file_processor::ASCII_CHARACTER_STRING, utils};
+    use crate::{file_processor::ASCII_CHARACTER_STRING, test_utils, utils};
 
     use super::Pattern;
 
@@ -502,18 +500,6 @@ mod tests_pattern {
         utils::round_to_dp(a, decimal_places) == utils::round_to_dp(b, decimal_places)
     }
 
-    fn test_path_builder(test_type: &str, test_id: &str) -> String {
-        let test_dir = std::fs::canonicalize(format!("./tests/{test_type}/{test_id}"))
-            .expect("failed to find test directory");
-        let resolved_dir = test_dir.to_string_lossy().to_string();
-
-        if !Path::new(&resolved_dir).exists() {
-            panic!("failed to find test directory at '{resolved_dir}'");
-        }
-
-        resolved_dir
-    }
-
     fn build_test(
         test_type: &str,
         test_id: &str,
@@ -521,14 +507,9 @@ mod tests_pattern {
         bytes: bool,
         entropy: bool,
     ) -> Pattern {
-        let test_dir = test_path_builder(test_type, test_id);
+        let test_dir = test_utils::test_path_builder(test_type, test_id);
 
-        let mut pattern = Pattern::new(
-            "test",
-            "test",
-            vec!["test".to_string()],
-            vec!["text/plain".to_string()],
-        );
+        let mut pattern = Pattern::new("test", "test", vec!["test".to_string()], vec![]);
         pattern.build_patterns_from_data(&test_dir, "test", strings, bytes, entropy);
 
         pattern
