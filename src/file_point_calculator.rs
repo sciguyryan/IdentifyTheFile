@@ -1,3 +1,5 @@
+use hashbrown::HashSet;
+
 use crate::{file_processor, pattern::Pattern, utils};
 
 /// The maximum number of points to be awarded for entropy matching.
@@ -62,11 +64,12 @@ impl FilePointCalculator {
         // In the best case, it might be outside the bounds of the file, thereby
         // letting is bail the loop early. Though this is likely something that will
         // only come up with small files.
+        let bytes_len = bytes.len();
         let mut points = 0.0;
         for (start, sequence) in &pattern.data.sequences {
             let len = sequence.len();
             let end = *start + len;
-            if *start > bytes.len() || end > bytes.len() {
+            if *start > bytes_len || end > bytes_len {
                 return (0.0, false);
             }
 
@@ -119,13 +122,13 @@ impl FilePointCalculator {
             return 0.0;
         }
 
-        let strings = file_processor::generate_file_string_hashset(bytes);
+        let strings: HashSet<String> =
+            HashSet::from_iter(file_processor::extract_file_strings(bytes));
 
         pattern
             .data
             .strings
-            .iter()
-            .filter(|s| strings.contains(*s))
+            .intersection(&strings)
             .map(|s| s.len() as f64)
             .sum()
     }

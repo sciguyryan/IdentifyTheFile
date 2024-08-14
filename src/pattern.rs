@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
+use hashbrown::HashSet;
 use serde_derive::{Deserialize, Serialize};
-use std::{collections::HashSet, fs::File, io::Write, path::PathBuf};
+use std::{fs::File, io::Write, path::PathBuf};
 
 use crate::{
     file_point_calculator::{CONFIDENCE_SCALE_FACTOR, FILE_EXTENSION_POINTS, MAX_ENTROPY_POINTS},
@@ -72,11 +73,12 @@ impl Pattern {
     ) {
         let mut first_byte_sequence_pass = true;
 
+        let files = utils::list_files_of_type(source_directory, target_extension);
+
         let mut common_byte_sequences = Vec::<(usize, Vec<u8>)>::new();
-        let mut all_strings = Vec::new();
+        let mut all_strings = Vec::with_capacity(files.len());
         let mut byte_distribution: [usize; 256] = [0; 256];
 
-        let files = utils::list_files_of_type(source_directory, target_extension);
         for file_path in &files {
             let chunk =
                 file_processor::read_file_header_chunk(file_path).expect("failed to read file");
@@ -86,8 +88,8 @@ impl Pattern {
             }
 
             if scan_strings {
-                let string_hashset = file_processor::generate_file_string_hashset(&chunk);
-                all_strings.push(string_hashset);
+                let strings = file_processor::extract_file_strings(&chunk);
+                all_strings.push(strings);
             }
 
             // On the first pass, we simply set the matching sequence as the entire byte block.
@@ -118,7 +120,7 @@ impl Pattern {
         // Sieve the strings to retain only the common ones.
         let mut common_strings = HashSet::new();
         if scan_strings {
-            common_strings = file_processor::common_string_sieve(&mut all_strings);
+            common_strings = file_processor::common_string_sieve(all_strings);
         }
 
         if scan_byte_distribution {
@@ -283,7 +285,8 @@ pub fn from_simd_json_str(input: &str) -> Result<Pattern, Box<dyn std::error::Er
 #[cfg(test)]
 mod tests_pattern {
     use core::str;
-    use std::collections::HashSet;
+
+    use hashbrown::HashSet;
 
     use crate::{file_processor::ASCII_CHARACTER_STRING, test_utils, utils};
 
@@ -296,7 +299,7 @@ mod tests_pattern {
 
         let set = HashSet::from(["ABCDEFGHIJK".to_string()]);
 
-        assert_eq!(pattern.data.strings, set,);
+        assert_eq!(pattern.data.strings, set);
     }
 
     #[test]

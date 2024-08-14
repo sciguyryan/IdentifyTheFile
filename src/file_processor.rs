@@ -1,7 +1,6 @@
-use hashbrown::HashSet as HashbrownSet;
+use hashbrown::HashSet;
 use rayon::prelude::*;
 use std::{
-    collections::{HashMap, HashSet},
     fs::File,
     io::{self, BufReader, Read},
     sync::OnceLock,
@@ -10,13 +9,13 @@ use std::{
 pub const ASCII_CHARACTER_STRING: &str =
     " !#$+,-./0123456789<=>?ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz";
 pub static ASCII_READABLE_CHARACTERS: OnceLock<Vec<u8>> = OnceLock::new();
-pub static ASCII_READABLE_CHARACTERS_SET: OnceLock<HashbrownSet<u8>> = OnceLock::new();
+pub static ASCII_READABLE_CHARACTERS_SET: OnceLock<HashSet<u8>> = OnceLock::new();
 
 pub fn get_ascii_readable_characters() -> &'static Vec<u8> {
     ASCII_READABLE_CHARACTERS.get_or_init(|| ASCII_CHARACTER_STRING.as_bytes().to_vec())
 }
 
-pub fn get_ascii_readable_characters_set() -> &'static HashbrownSet<u8> {
+pub fn get_ascii_readable_characters_set() -> &'static HashSet<u8> {
     ASCII_READABLE_CHARACTERS_SET
         .get_or_init(|| get_ascii_readable_characters().iter().copied().collect())
 }
@@ -33,15 +32,58 @@ const MIN_BYTE_SEQUENCE_LENGTH: usize = 1;
 /// The maximum length of a byte sequence.
 const MAX_BYTE_SEQUENCE_LENGTH: usize = 16;
 
+/// The number of characters that need to be present in a string before parallel processing
+/// should be used for the substring generator.
+const PARALLEL_STRING_THRESHOLD: usize = 50;
+
+#[inline]
 fn all_substrings_over_min_size(string: &str) -> Vec<&str> {
     let len = string.len();
-    let max_capacity = ((len - MIN_STRING_LENGTH + 1) * (len - MIN_STRING_LENGTH + 2)) / 2;
+    if len < MIN_STRING_LENGTH {
+        return Vec::new();
+    }
+
+    if len < PARALLEL_STRING_THRESHOLD {
+        all_substrings_over_min_size_sequential(string)
+    } else {
+        all_substrings_over_min_size_parallel(string)
+    }
+}
+
+#[inline]
+fn all_substrings_over_min_size_parallel(string: &str) -> Vec<&str> {
+    let len = string.len();
+    (0..len)
+        .into_par_iter()
+        .flat_map(|start| {
+            let start_min_len = start + MIN_STRING_LENGTH;
+            if start_min_len > len {
+                return Vec::new();
+            }
+            let mut local_substrings = Vec::with_capacity(len - start_min_len + 1);
+            for end in start_min_len..=len {
+                unsafe {
+                    local_substrings.push(string.get_unchecked(start..end));
+                }
+            }
+            local_substrings
+        })
+        .collect()
+}
+
+#[inline]
+fn all_substrings_over_min_size_sequential(string: &str) -> Vec<&str> {
+    let len = string.len();
+
+    let num_substrings = len - MIN_STRING_LENGTH;
+    let max_capacity = (num_substrings * (num_substrings + 1)) / 2;
     let mut substrings = Vec::with_capacity(max_capacity);
+
+    let end_bound = len + 1;
     for start in 0..len {
-        for end in (start + MIN_STRING_LENGTH)..=len {
+        let start_min_len = start + MIN_STRING_LENGTH;
+        for end in start_min_len..end_bound {
             unsafe {
-                // Since we know the index will always be within the bounds of the string
-                // the unsafe is actually safe here.
                 substrings.push(string.get_unchecked(start..end));
             }
         }
@@ -50,44 +92,46 @@ fn all_substrings_over_min_size(string: &str) -> Vec<&str> {
     substrings
 }
 
-pub fn common_string_sieve(hashsets: &mut Vec<HashSet<String>>) -> HashSet<String> {
-    if hashsets.is_empty() {
+#[inline]
+pub fn common_string_sieve(sets: Vec<HashSet<String>>) -> HashSet<String> {
+    let mut sets = sets.to_owned();
+    if sets.is_empty() {
         return HashSet::new();
     }
 
     // Find largest set to maximize the matching potential.
-    let largest_set_index = hashsets
+    let largest_set_index = sets
         .iter()
         .enumerate()
         .max_by_key(|(_, set)| set.len())
         .map(|(index, _)| index)
         .unwrap_or(0);
-    let mut common_strings_hashset = hashsets.swap_remove(largest_set_index);
+    let mut common_strings_hashset = sets.swap_remove(largest_set_index);
 
-    for mut set in hashsets.drain(..) {
+    for mut set in sets.drain(..) {
         // Extract the common elements.
-        let mut temp_set: HashSet<_> = common_strings_hashset.intersection(&set).cloned().collect();
+        let intersections: HashSet<_> =
+            common_strings_hashset.intersection(&set).cloned().collect();
 
-        // Retain items not present in the common set.
-        set.retain(|s| !temp_set.contains(s));
+        // Retain items -not- present in the common set.
+        set.retain(|s| !intersections.contains(s));
 
         // Update the common set by finding the longest substring match common to
         // the reference and target strings, if applicable.
-        temp_set.par_extend(
-            common_strings_hashset
-                .par_iter()
-                .filter_map(|common_string| {
-                    set.par_iter()
-                        .filter_map(|string| {
-                            largest_common_substring(string, common_string)
-                                .filter(|s| !s.is_empty())
-                                .map(|s| s.to_string())
-                        })
-                        .max_by_key(|s| s.len())
-                }),
-        );
-
-        common_strings_hashset = temp_set;
+        common_strings_hashset = common_strings_hashset
+            .par_iter()
+            .flat_map(|common_string| {
+                set.par_iter()
+                    .filter_map(|string| {
+                        largest_common_substring(string, common_string)
+                            .filter(|s| !s.is_empty())
+                            .map(|s| s.to_string())
+                    })
+                    .max_by_key(|s| s.len())
+            })
+            // Add the intersections back to the new common set.
+            .chain(intersections.into_par_iter())
+            .collect();
     }
 
     // Filter out substrings of larger items.
@@ -104,7 +148,7 @@ pub fn common_string_sieve(hashsets: &mut Vec<HashSet<String>>) -> HashSet<Strin
     final_hashset
 }
 
-#[inline(always)]
+#[inline]
 pub fn count_byte_frequencies(data: &[u8], frequencies: &mut [usize; 256]) {
     // Process data in parallel chunks and aggregate the results using
     // a reduce operation.
@@ -131,49 +175,49 @@ pub fn count_byte_frequencies(data: &[u8], frequencies: &mut [usize; 256]) {
 }
 
 #[inline]
-fn extract_matching_sequences(seq_1: &[u8], seq_2: &[u8]) -> HashMap<usize, Vec<u8>> {
-    let mut subsequences = HashMap::with_capacity(100);
-    let mut sequence_start = None;
-    let mut subsequence = Vec::with_capacity(seq_1.len().min(seq_2.len()));
+fn extract_matching_sequences(
+    start_at: &usize,
+    seq_1: &[u8],
+    seq_2: &[u8],
+) -> Vec<(usize, Vec<u8>)> {
+    let max_len = seq_1.len().min(seq_2.len());
+
+    let mut subsequences = Vec::with_capacity(100);
+    let mut subsequence_start = None;
+    let mut subsequence = Vec::with_capacity(max_len);
 
     for (i, (&a, &b)) in seq_1.iter().zip(seq_2.iter()).enumerate() {
-        let mut push_sequence = false;
-
         if a == b {
-            // Start a new sequence, if we aren't already in one.
-            if sequence_start.is_none() {
-                sequence_start = Some(i);
+            if subsequence_start.is_none() {
+                subsequence_start = Some(i);
             }
-
             subsequence.push(a);
 
-            // End the current sequence if the length exceeds the maximum.
             if subsequence.len() >= MAX_BYTE_SEQUENCE_LENGTH {
-                push_sequence = true;
+                subsequences.push((
+                    *start_at + subsequence_start.take().unwrap(),
+                    subsequence.clone(),
+                ));
+                subsequence.clear();
             }
-        } else if sequence_start.is_some() {
-            push_sequence = true;
-        }
-
-        if push_sequence {
-            if let Some(start) = sequence_start.take() {
-                subsequences.insert(start, std::mem::take(&mut subsequence));
-                sequence_start = None;
-            }
+        } else if let Some(start) = subsequence_start.take() {
+            subsequences.push((*start_at + start, std::mem::take(&mut subsequence)));
+            subsequence.clear();
         }
     }
 
-    // Check for any remaining sequence at the end
-    if let Some(start) = sequence_start {
+    // Check for any remaining sequence at the end.
+    if let Some(start) = subsequence_start {
         if !subsequence.is_empty() {
-            subsequences.insert(start, subsequence);
+            subsequences.push((*start_at + start, subsequence));
         }
     }
 
     subsequences
 }
 
-pub fn generate_file_string_hashset(bytes: &[u8]) -> HashSet<String> {
+#[inline]
+pub fn extract_file_strings(bytes: &[u8]) -> HashSet<String> {
     let readable_subset = get_ascii_readable_characters_set().clone();
 
     let mut strings = HashSet::with_capacity(256);
@@ -230,7 +274,7 @@ pub fn refine_common_byte_sequences_v2(
 ) {
     let len = file_bytes.len();
     let mut final_sequences = Vec::with_capacity(common_byte_sequences.len());
-    for (index, test_sequence) in common_byte_sequences.iter() {
+    for (index, test_sequence) in common_byte_sequences.iter().filter(|(i, _)| *i <= len) {
         if *index > len {
             continue;
         }
@@ -244,17 +288,16 @@ pub fn refine_common_byte_sequences_v2(
             continue;
         }
 
-        let subsequences =
-            extract_matching_sequences(test_sequence, &file_bytes[*index..segment_read_length]);
+        let subsequences = extract_matching_sequences(
+            index,
+            test_sequence,
+            &file_bytes[*index..segment_read_length],
+        );
 
         // Note - remember that the index in the sequence list is absolute
         // over the entire file, not the substring. This means we need
         // to add the overall index to the sub index!
-        final_sequences.extend(
-            subsequences
-                .into_iter()
-                .map(|(sub_index, seq)| (*index + sub_index, seq)),
-        );
+        final_sequences.extend_from_slice(&subsequences);
     }
 
     *common_byte_sequences = final_sequences;
