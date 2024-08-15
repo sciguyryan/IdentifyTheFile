@@ -5,7 +5,8 @@ use std::{fs::File, io::Write, path::PathBuf};
 
 use crate::{
     file_point_calculator::{CONFIDENCE_SCALE_FACTOR, FILE_EXTENSION_POINTS, MAX_ENTROPY_POINTS},
-    file_processor, utils,
+    file_processor::{self, get_ascii_readable_characters_set},
+    utils,
 };
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
@@ -88,7 +89,8 @@ impl Pattern {
             }
 
             if scan_strings {
-                let strings = file_processor::extract_file_strings(&chunk);
+                let readable = get_ascii_readable_characters_set().clone();
+                let strings = file_processor::extract_file_strings(&chunk, &readable);
                 all_strings.push(strings);
             }
 
@@ -120,7 +122,12 @@ impl Pattern {
         // Sieve the strings to retain only the common ones.
         let mut common_strings = HashSet::new();
         if scan_strings {
-            common_strings = file_processor::common_string_sieve(all_strings);
+            let mut all_string_sets: Vec<HashSet<&str>> = Vec::with_capacity(all_strings.len());
+            for string_set in &all_strings {
+                all_string_sets.push(string_set.iter().map(AsRef::as_ref).collect());
+            }
+
+            common_strings = file_processor::common_string_sieve(&mut all_string_sets);
         }
 
         if scan_byte_distribution {
@@ -288,7 +295,7 @@ mod tests_pattern {
 
     use hashbrown::HashSet;
 
-    use crate::{file_processor::ASCII_CHARACTER_STRING, test_utils, utils};
+    use crate::{test_utils, utils};
 
     use super::Pattern;
 
@@ -365,7 +372,19 @@ mod tests_pattern {
         // Testing that all of the safe string characters are returned in a string.
         let pattern = build_test("strings", "8", true, false, false);
 
-        let set = HashSet::from([ASCII_CHARACTER_STRING.to_ascii_uppercase()]);
+        // TODO - write note.
+        // EXPECTED = "JKLMNOPQRSTUVWXYZ_ABCDEFGHIJKLMN", " !#$+,-./0123456789<=>?ABCDEFGHI"
+
+        let set = HashSet::from([
+            "JKLMNOPQRSTUVWXYZ_ABCDEFGHIJKLMN".to_string(),
+            " !#$+,-./0123456789<=>?ABCDEFGHI".to_string(),
+        ]);
+        // Due to the string length limits, the string will be broken into segments.
+        /*let set = HashSet::from([
+            " !#$+,-./0123456789<=>?A".to_string(),
+            "BCDEFGHIJKLMNOPQRSTUVWXY".to_string(),
+            "Z_ABCDEFGHIJKLMNOPQRSTUV".to_string()
+        ]);*/
 
         assert_eq!(pattern.data.strings, set,);
     }

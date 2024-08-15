@@ -1,6 +1,10 @@
 use hashbrown::HashSet;
 
-use crate::{file_processor, pattern::Pattern, utils};
+use crate::{
+    file_processor::{self, get_ascii_readable_characters_set},
+    pattern::Pattern,
+    utils,
+};
 
 /// The maximum number of points to be awarded for entropy matching.
 pub const MAX_ENTROPY_POINTS: f64 = 15.0;
@@ -25,14 +29,12 @@ impl FilePointCalculator {
         if pattern.data.scan_sequences {
             let (p, success) = Self::test_byte_sequences(pattern, chunk);
 
-            // Byte sequence matches, if specified, MUST exist for a match to be valid at all.
-            // If the points returned are zero, the file cannot be a match.
-            // These should be tested before the strings and entropy.
-            if success {
-                points += p;
-            } else {
+            // Byte sequence matches, if specified, MUST be present for a file to match the pattern.
+            if !success {
                 return 0;
             }
+
+            points += p;
         }
 
         if pattern.data.scan_strings {
@@ -65,10 +67,10 @@ impl FilePointCalculator {
         // letting is bail the loop early. Though this is likely something that will
         // only come up with small files.
         let bytes_len = bytes.len();
-        let mut points = 0.0;
+        let mut points = 0;
         for (start, sequence) in &pattern.data.sequences {
             let len = sequence.len();
-            let end = *start + len;
+            let end = start.saturating_add(len);
             if *start > bytes_len || end > bytes_len {
                 return (0.0, false);
             }
@@ -79,10 +81,10 @@ impl FilePointCalculator {
                 }
             }
 
-            points += len as f64;
+            points += len;
         }
 
-        (points, true)
+        (points as f64, true)
     }
 
     #[inline(always)]
@@ -122,8 +124,9 @@ impl FilePointCalculator {
             return 0.0;
         }
 
+        let readable = get_ascii_readable_characters_set().clone();
         let strings: HashSet<String> =
-            HashSet::from_iter(file_processor::extract_file_strings(bytes));
+            HashSet::from_iter(file_processor::extract_file_strings(bytes, &readable));
 
         pattern
             .data

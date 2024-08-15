@@ -94,23 +94,37 @@ fn main() {
     return;*/
 
     /*let files = utils::list_files_of_type("D:\\Downloads\\YouTube", "webm");
-
     println!("{}", files.len());
 
     use std::time::Instant;
-    let now = Instant::now();
+    let mut runs = vec![];
 
-    for file in files {
-        process_identify_command(&Commands::Identify {
-            pattern_source_dir: "D:\\Storage\\File Type Samples\\patterns".to_string(),
-            target_pattern: "".to_string(),
-            result_count: -1,
-            file,
-        });
+    for _ in 0..10 {
+        let now = Instant::now();
+
+        for file in &files {
+            process_identify_command(&Commands::Identify {
+                pattern_source_dir: "D:\\Storage\\File Type Samples\\patterns".to_string(),
+                target_pattern: "".to_string(),
+                result_count: -1,
+                file: file.clone(),
+            });
+        }
+
+        let elapsed = now.elapsed();
+        runs.push(elapsed.as_secs_f64())
     }
 
-    let elapsed = now.elapsed();
-    println!("Elapsed: {:.2?}", elapsed);
+    let max = runs
+        .iter()
+        .max_by(|x, y| x.partial_cmp(y).unwrap())
+        .unwrap();
+    let min = runs
+        .iter()
+        .min_by(|x, y| x.partial_cmp(y).unwrap())
+        .unwrap();
+    let average = runs.iter().sum::<f64>() / runs.len() as f64;
+    println!("min = {min}, max = {max}, average = {average}");
     return;*/
 
     /*process_identify_command(&Commands::Identify {
@@ -294,7 +308,7 @@ fn process_identify_command(cmd: &Commands) {
             results.truncate(*result_count as usize);
         }
 
-        print_results(&results, &pattern_handler);
+        //print_results(&results, &pattern_handler);
     }
 }
 
