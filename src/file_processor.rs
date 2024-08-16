@@ -22,6 +22,8 @@ pub fn get_ascii_readable_characters_set() -> &'static HashSet<u8> {
 
 /// The size of a file chunk to read. Larger is more accurate but slower.
 const FILE_CHUNK_SIZE: usize = 10 * 1024 * 1024; // 10 MB
+/// The size of a byte chunk to be processed in parallel when computing byte distributions.
+const BYTE_COUNT_CHUNK_SIZE: usize = 512; // 1 KB
 
 /// The minimum length of a string that will be retained.
 const MIN_STRING_LENGTH: usize = 5;
@@ -35,9 +37,6 @@ const MAX_BYTE_SEQUENCE_LENGTH: usize = 16;
 /// The number of characters that need to be present in a string before parallel processing
 /// should be used for the substring generator.
 const PARALLEL_STRING_THRESHOLD: usize = 16;
-/// The number of string collections that need to be present before parallel processing
-/// should be used for the string sieve.
-const PARALLEL_STRING_SIEVE_THRESHOLD: usize = 16;
 
 #[inline]
 fn all_substrings_over_min_size(string: &str) -> Vec<&str> {
@@ -94,26 +93,46 @@ fn all_substrings_over_min_size_sequential(string: &str) -> Vec<&str> {
 }
 
 #[inline]
-pub fn common_string_sieve(sets: &mut [HashSet<&str>]) -> HashSet<String> {
+pub fn common_string_sieve(sets: &mut [Vec<&str>]) -> Vec<String> {
     if sets.is_empty() {
-        return HashSet::new();
+        return Vec::new();
     }
 
     // Find the largest set to maximize the matching potential.
     sets.sort_unstable_by_key(|b| std::cmp::Reverse(b.len()));
 
-    let common_strings_hashset = if sets.len() < PARALLEL_STRING_SIEVE_THRESHOLD {
-        common_string_sieve_parallel(sets)
-    } else {
-        common_string_sieve_sequential(sets)
-    };
+    // Start with the first set as the initial common set.
+    let mut common_strings: Vec<&str>;
+    unsafe {
+        common_strings = sets.get_unchecked(0).clone();
+    }
+
+    for set in sets.iter().skip(1) {
+        // If the two strings match, the first will be returned.
+        // Otherwise, the largest common substring will be returned.
+        common_strings = common_strings
+            .par_iter()
+            .filter_map(|&common_string| {
+                // We're using a normal iterator here since the overhead of a parallel
+                // iterator inside a parallel iterator is more costly than beneficial.
+                set.iter()
+                    .filter_map(|&string| largest_common_substring(string, common_string))
+                    .max_by_key(|s| s.len())
+            })
+            .collect();
+
+        // Early exit if no common strings remain.
+        if common_strings.is_empty() {
+            break;
+        }
+    }
 
     // Filter out substrings of larger strings, we only want to keep the
     // largest possible match.
-    let final_set: HashSet<_> = common_strings_hashset
+    let final_set: Vec<_> = common_strings
         .iter()
         .filter(|&&item| {
-            !common_strings_hashset
+            !common_strings
                 .iter()
                 .any(|&other| other != item && other.contains(item))
         })
@@ -124,81 +143,9 @@ pub fn common_string_sieve(sets: &mut [HashSet<&str>]) -> HashSet<String> {
 }
 
 #[inline]
-pub fn common_string_sieve_parallel<'a>(sets: &mut [HashSet<&'a str>]) -> HashSet<&'a str> {
-    // The largest set will always appear first.
-    let mut common_strings_hashset = sets.first().cloned().unwrap();
-
-    for set in sets.iter_mut().skip(1) {
-        common_strings_hashset = common_strings_hashset
-            .par_iter()
-            .flat_map(|common_string| {
-                set.par_iter()
-                    .filter_map(|&string| {
-                        if !common_strings_hashset.contains(&string) {
-                            // Only consider strings not present in the intersection of the two sets.
-                            largest_common_substring(string, common_string)
-                                .filter(|s| !s.is_empty())
-                        } else {
-                            None
-                        }
-                    })
-                    // Only retain the largest substring.
-                    .max_by_key(|s| s.len())
-            })
-            .chain(
-                // Add the common items (set intersections) back into the final set.
-                common_strings_hashset
-                    .intersection(set)
-                    .copied()
-                    .collect::<HashSet<_>>()
-                    .into_par_iter(),
-            )
-            .collect();
-    }
-
-    common_strings_hashset
-}
-
-#[inline]
-pub fn common_string_sieve_sequential<'a>(sets: &mut [HashSet<&'a str>]) -> HashSet<&'a str> {
-    // The largest set will always appear first.
-    let mut common_strings_hashset = sets.first().cloned().unwrap();
-
-    for set in sets.iter_mut().skip(1) {
-        common_strings_hashset = common_strings_hashset
-            .iter()
-            .flat_map(|common_string| {
-                set.iter()
-                    .filter_map(|&string| {
-                        if !common_strings_hashset.contains(&string) {
-                            // Only consider strings not present in the intersection of the two sets.
-                            largest_common_substring(string, common_string)
-                                .filter(|s| !s.is_empty())
-                        } else {
-                            None
-                        }
-                    })
-                    // Only retain the largest substring.
-                    .max_by_key(|s| s.len())
-            })
-            .chain(
-                // Add the common items (set intersections) back into the final set.
-                common_strings_hashset
-                    .intersection(set)
-                    .copied()
-                    .collect::<HashSet<_>>()
-                    .into_iter(),
-            )
-            .collect();
-    }
-
-    common_strings_hashset
-}
-
-#[inline]
 pub fn count_byte_frequencies(data: &[u8], frequencies: &mut [usize; 256]) {
     *frequencies = data
-        .par_chunks(512)
+        .par_chunks(BYTE_COUNT_CHUNK_SIZE)
         .fold(
             || [0; 256],
             |mut local_frequencies, chunk| {
@@ -219,7 +166,7 @@ pub fn count_byte_frequencies(data: &[u8], frequencies: &mut [usize; 256]) {
         );
 }
 
-#[inline]
+#[inline(always)]
 unsafe fn extract_matching_sequences(
     start_at: &usize,
     seq_1: &[u8],
@@ -270,21 +217,16 @@ unsafe fn extract_matching_sequences(
 pub fn extract_file_strings(bytes: &[u8], readable: &HashSet<u8>) -> HashSet<String> {
     let mut strings = HashSet::with_capacity(128);
     let mut string_buffer = String::with_capacity(MAX_STRING_LENGTH);
-    for (i, byte) in bytes.iter().enumerate() {
-        let valid_readable = readable.contains(byte);
-        if valid_readable {
-            // Push the character onto the buffer.
+    for byte in bytes {
+        if readable.contains(byte) {
             string_buffer.push(*byte as char);
-        }
 
-        // We should push the string buffer for any of the following conditions:
-        // 1. There is a "non-readable" byte, so we consider the string terminated.
-        // 2. The string is of the maximum length.
-        // 3. This is the final byte.
-        if !valid_readable || string_buffer.len() == MAX_STRING_LENGTH || i == bytes.len() - 1 {
-            // Only retain strings that conform with the minimum length requirements.
+            if string_buffer.len() == MAX_STRING_LENGTH {
+                strings.insert(string_buffer.to_ascii_uppercase());
+                string_buffer.clear();
+            }
+        } else {
             if string_buffer.len() >= MIN_STRING_LENGTH {
-                // Convert the string to uppercase and insert into the set.
                 strings.insert(string_buffer.to_ascii_uppercase());
             }
 
@@ -292,10 +234,19 @@ pub fn extract_file_strings(bytes: &[u8], readable: &HashSet<u8>) -> HashSet<Str
         }
     }
 
+    if string_buffer.len() >= MIN_STRING_LENGTH {
+        strings.insert(string_buffer.to_ascii_uppercase());
+    }
+
     strings
 }
 
+#[inline]
 fn largest_common_substring<'a>(str_1: &'a str, str_2: &str) -> Option<&'a str> {
+    if str_1 == str_2 {
+        return Some(str_1);
+    }
+
     let mut str_1_substrings = all_substrings_over_min_size(str_1);
     str_1_substrings.sort_unstable_by_key(|b| std::cmp::Reverse(b.len()));
 

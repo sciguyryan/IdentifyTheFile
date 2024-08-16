@@ -120,9 +120,9 @@ impl Pattern {
         }
 
         // Sieve the strings to retain only the common ones.
-        let mut common_strings = HashSet::new();
+        let mut common_strings = Vec::new();
         if scan_strings {
-            let mut all_string_sets: Vec<HashSet<&str>> = Vec::with_capacity(all_strings.len());
+            let mut all_string_sets: Vec<Vec<&str>> = Vec::with_capacity(all_strings.len());
             for string_set in &all_strings {
                 all_string_sets.push(string_set.iter().map(AsRef::as_ref).collect());
             }
@@ -136,7 +136,7 @@ impl Pattern {
 
         // Add the computed information into the struct.
         self.data.scan_strings = scan_strings;
-        self.data.strings = common_strings;
+        self.data.strings = HashSet::from_iter(common_strings);
         self.data.scan_sequences = scan_byte_sequences;
         self.data.sequences = common_byte_sequences;
         self.data.scan_composition = scan_byte_distribution;
