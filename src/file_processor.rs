@@ -42,9 +42,9 @@ const fn generate_uppercase_map() -> [char; 256] {
 }
 
 /// The size of a file chunk to read. Larger is more accurate but slower.
-const FILE_CHUNK_SIZE: usize = 5 * 1024 * 1024; // 10 MB
+const FILE_CHUNK_SIZE: usize = 5 * 1024 * 1024; // 5 MB
 /// The size of a byte chunk to be processed in parallel when computing byte distributions.
-const BYTE_COUNT_CHUNK_SIZE: usize = 512; // 1 KB
+const BYTE_COUNT_CHUNK_SIZE: usize = 512; // 512 B
 
 /// The minimum length of a string that will be retained.
 const MIN_STRING_LENGTH: usize = 5;
