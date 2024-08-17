@@ -5,8 +5,7 @@ use std::{fs::File, io::Write, path::PathBuf};
 
 use crate::{
     file_point_calculator::{CONFIDENCE_SCALE_FACTOR, FILE_EXTENSION_POINTS, MAX_ENTROPY_POINTS},
-    file_processor::{self, get_ascii_readable_characters_set},
-    utils,
+    file_processor, utils,
 };
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
@@ -89,8 +88,7 @@ impl Pattern {
             }
 
             if scan_strings {
-                let readable = get_ascii_readable_characters_set().clone();
-                let strings = file_processor::extract_file_strings(&chunk, &readable);
+                let strings = file_processor::extract_file_strings(&chunk);
                 all_strings.push(strings);
             }
 
@@ -372,19 +370,9 @@ mod tests_pattern {
         // Testing that all of the safe string characters are returned in a string.
         let pattern = build_test("strings", "8", true, false, false);
 
-        // TODO - write note.
-        // EXPECTED = "JKLMNOPQRSTUVWXYZ_ABCDEFGHIJKLMN", " !#$+,-./0123456789<=>?ABCDEFGHI"
-
         let set = HashSet::from([
-            "JKLMNOPQRSTUVWXYZ_ABCDEFGHIJKLMN".to_string(),
-            " !#$+,-./0123456789<=>?ABCDEFGHI".to_string(),
+            " !#$+,-./0123456789<=>?ABCDEFGHIJKLMNOPQRSTUVWXYZ_ABCDEFGHIJKLMN".to_string(),
         ]);
-        // Due to the string length limits, the string will be broken into segments.
-        /*let set = HashSet::from([
-            " !#$+,-./0123456789<=>?A".to_string(),
-            "BCDEFGHIJKLMNOPQRSTUVWXY".to_string(),
-            "Z_ABCDEFGHIJKLMNOPQRSTUV".to_string()
-        ]);*/
 
         assert_eq!(pattern.data.strings, set,);
     }

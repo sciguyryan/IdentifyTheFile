@@ -3,32 +3,53 @@ use rayon::prelude::*;
 use std::{
     fs::File,
     io::{self, BufReader, Read},
-    sync::OnceLock,
 };
 
 pub const ASCII_CHARACTER_STRING: &str =
     " !#$+,-./0123456789<=>?ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz";
-pub static ASCII_READABLE_CHARACTERS: OnceLock<&[u8]> = OnceLock::new();
-pub static ASCII_READABLE_CHARACTERS_SET: OnceLock<HashSet<u8>> = OnceLock::new();
+const ASCII_READABLE_CHARACTERS: &[u8] = ASCII_CHARACTER_STRING.as_bytes();
+const ASCII_READABLE_CHARACTERS_SET: [bool; 256] =
+    get_ascii_readable_characters_set(ASCII_READABLE_CHARACTERS);
 
-pub fn get_ascii_readable_characters() -> &'static [u8] {
-    ASCII_READABLE_CHARACTERS.get_or_init(|| ASCII_CHARACTER_STRING.as_bytes())
+#[inline(always)]
+const fn get_ascii_readable_characters_set(chars: &[u8]) -> [bool; 256] {
+    let mut is_readable = [false; 256];
+    let mut i = 0;
+
+    while i < chars.len() {
+        let c = chars[i];
+        is_readable[c as usize] = true;
+        i += 1;
+    }
+
+    is_readable
 }
 
-pub fn get_ascii_readable_characters_set() -> &'static HashSet<u8> {
-    ASCII_READABLE_CHARACTERS_SET
-        .get_or_init(|| get_ascii_readable_characters().iter().copied().collect())
+const ASCII_UPPERCASE_MAP: [char; 256] = generate_uppercase_map();
+
+#[inline(always)]
+const fn generate_uppercase_map() -> [char; 256] {
+    let mut map = ['\0'; 256];
+    let mut i = 0;
+
+    while i < 256 {
+        map[i] = ((i as u8) as char).to_ascii_uppercase();
+
+        i += 1;
+    }
+
+    map
 }
 
 /// The size of a file chunk to read. Larger is more accurate but slower.
-const FILE_CHUNK_SIZE: usize = 10 * 1024 * 1024; // 10 MB
+const FILE_CHUNK_SIZE: usize = 5 * 1024 * 1024; // 10 MB
 /// The size of a byte chunk to be processed in parallel when computing byte distributions.
 const BYTE_COUNT_CHUNK_SIZE: usize = 512; // 1 KB
 
 /// The minimum length of a string that will be retained.
 const MIN_STRING_LENGTH: usize = 5;
 /// The maximum length of a string that will be retained.
-pub const MAX_STRING_LENGTH: usize = 32;
+pub const MAX_STRING_LENGTH: usize = 64;
 /// The minimum length of a byte sequence.
 const MIN_BYTE_SEQUENCE_LENGTH: usize = 1;
 /// The maximum length of a byte sequence.
@@ -52,7 +73,7 @@ fn all_substrings_over_min_size(string: &str) -> Vec<&str> {
     }
 }
 
-#[inline]
+#[inline(always)]
 fn all_substrings_over_min_size_parallel(string: &str) -> Vec<&str> {
     let len = string.len();
     (0..len)
@@ -70,7 +91,7 @@ fn all_substrings_over_min_size_parallel(string: &str) -> Vec<&str> {
         .collect()
 }
 
-#[inline]
+#[inline(always)]
 fn all_substrings_over_min_size_sequential(string: &str) -> Vec<&str> {
     let len = string.len();
     (0..len)
@@ -82,6 +103,8 @@ fn all_substrings_over_min_size_sequential(string: &str) -> Vec<&str> {
 
             let mut local_substrings = Vec::with_capacity(len - start_min_len + 1);
             for end in start_min_len..=len {
+                // This block is safe since we can guarantee that we will remain
+                // within the bounds of the vector.
                 unsafe {
                     local_substrings.push(string.get_unchecked(start..end));
                 }
@@ -102,10 +125,7 @@ pub fn common_string_sieve(sets: &mut [Vec<&str>]) -> Vec<String> {
     sets.sort_unstable_by_key(|b| std::cmp::Reverse(b.len()));
 
     // Start with the first set as the initial common set.
-    let mut common_strings: Vec<&str>;
-    unsafe {
-        common_strings = sets.get_unchecked(0).clone();
-    }
+    let mut common_strings = unsafe { sets.get_unchecked(0).clone() };
 
     for set in sets.iter().skip(1) {
         // If the two strings match, the first will be returned.
@@ -142,7 +162,7 @@ pub fn common_string_sieve(sets: &mut [Vec<&str>]) -> Vec<String> {
     final_set
 }
 
-#[inline]
+#[inline(always)]
 pub fn count_byte_frequencies(data: &[u8], frequencies: &mut [usize; 256]) {
     *frequencies = data
         .par_chunks(BYTE_COUNT_CHUNK_SIZE)
@@ -175,59 +195,63 @@ unsafe fn extract_matching_sequences(
     let mut subsequences = Vec::with_capacity(100);
     let mut subsequence_start = usize::MAX;
 
-    // Use the length of the shorter slice to avoid out-of-bounds access.
-    let len = seq_1.len().min(seq_2.len());
+    // The safe use of pointers, since we have guaranteed that our indices
+    // will always be in bounds.
+    let ptr1 = seq_1.as_ptr();
+    let ptr2 = seq_2.as_ptr();
 
+    let mut buffer = Vec::with_capacity(MAX_BYTE_SEQUENCE_LENGTH);
+
+    let len = seq_1.len().min(seq_2.len());
     for i in 0..len {
-        if *seq_1.get_unchecked(i) == *seq_2.get_unchecked(i) {
+        if *ptr1.add(i) == *ptr2.add(i) {
             if subsequence_start == usize::MAX {
                 subsequence_start = i;
             }
 
-            if i - subsequence_start == MAX_BYTE_SEQUENCE_LENGTH {
-                subsequences.push((
-                    *start_at + subsequence_start,
-                    seq_1.get_unchecked(subsequence_start..i).to_vec(),
-                ));
+            buffer.push(*ptr1.add(i));
+
+            if buffer.len() == MAX_BYTE_SEQUENCE_LENGTH {
+                subsequences.push((*start_at + subsequence_start, std::mem::take(&mut buffer)));
 
                 // Immediately begin a new sequence, since we matched here, but we need to start a new sequence
                 // due to the sequence length limitations.
-                subsequence_start = i;
+                subsequence_start = i + 1;
             }
         } else if subsequence_start != usize::MAX {
-            subsequences.push((
-                *start_at + subsequence_start,
-                seq_1.get_unchecked(subsequence_start..i).to_vec(),
-            ));
+            subsequences.push((*start_at + subsequence_start, std::mem::take(&mut buffer)));
             subsequence_start = usize::MAX;
         }
     }
 
-    if subsequence_start != usize::MAX {
-        subsequences.push((
-            *start_at + subsequence_start,
-            seq_1.get_unchecked(subsequence_start..len).to_vec(),
-        ));
+    if !buffer.is_empty() {
+        subsequences.push((*start_at + subsequence_start, buffer));
     }
 
     subsequences
 }
 
-#[inline]
-pub fn extract_file_strings(bytes: &[u8], readable: &HashSet<u8>) -> HashSet<String> {
+#[inline(always)]
+pub fn extract_file_strings(bytes: &[u8]) -> HashSet<String> {
     let mut strings = HashSet::with_capacity(128);
     let mut string_buffer = String::with_capacity(MAX_STRING_LENGTH);
     for byte in bytes {
-        if readable.contains(byte) {
-            string_buffer.push(*byte as char);
+        let is_readable = unsafe { *ASCII_READABLE_CHARACTERS_SET.get_unchecked(*byte as usize) };
+
+        if is_readable {
+            // The map is a fixed size and the call is safe since it can never go
+            // beyond the bounds.
+            unsafe {
+                string_buffer.push(*ASCII_UPPERCASE_MAP.get_unchecked(*byte as usize));
+            }
 
             if string_buffer.len() == MAX_STRING_LENGTH {
-                strings.insert(string_buffer.to_ascii_uppercase());
+                strings.insert(std::mem::take(&mut string_buffer));
                 string_buffer.clear();
             }
         } else {
             if string_buffer.len() >= MIN_STRING_LENGTH {
-                strings.insert(string_buffer.to_ascii_uppercase());
+                strings.insert(std::mem::take(&mut string_buffer));
             }
 
             string_buffer.clear();
@@ -235,13 +259,13 @@ pub fn extract_file_strings(bytes: &[u8], readable: &HashSet<u8>) -> HashSet<Str
     }
 
     if string_buffer.len() >= MIN_STRING_LENGTH {
-        strings.insert(string_buffer.to_ascii_uppercase());
+        strings.insert(string_buffer);
     }
 
     strings
 }
 
-#[inline]
+#[inline(always)]
 fn largest_common_substring<'a>(str_1: &'a str, str_2: &str) -> Option<&'a str> {
     if str_1 == str_2 {
         return Some(str_1);
@@ -266,6 +290,7 @@ pub fn read_file_header_chunk(file_path: &str) -> io::Result<Vec<u8>> {
     Ok(buffer)
 }
 
+#[inline]
 pub fn refine_common_byte_sequences_v2(
     file_bytes: &[u8],
     common_byte_sequences: &mut Vec<(usize, Vec<u8>)>,

@@ -1,10 +1,6 @@
 use hashbrown::HashSet;
 
-use crate::{
-    file_processor::{self, get_ascii_readable_characters_set},
-    pattern::Pattern,
-    utils,
-};
+use crate::{file_processor, pattern::Pattern, utils};
 
 /// The maximum number of points to be awarded for entropy matching.
 pub const MAX_ENTROPY_POINTS: f64 = 15.0;
@@ -124,9 +120,8 @@ impl FilePointCalculator {
             return 0.0;
         }
 
-        let readable = get_ascii_readable_characters_set().clone();
         let strings: HashSet<String> =
-            HashSet::from_iter(file_processor::extract_file_strings(bytes, &readable));
+            HashSet::from_iter(file_processor::extract_file_strings(bytes));
 
         pattern
             .data

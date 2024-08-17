@@ -93,7 +93,7 @@ fn main() {
     println!("{}", fpc);
     return;*/
 
-    /*let files = utils::list_files_of_type("D:\\Downloads\\YouTube", "webm");
+    let files = utils::list_files_of_type("D:\\Downloads\\YouTube", "webm");
     println!("{}", files.len());
 
     use std::time::Instant;
@@ -125,7 +125,7 @@ fn main() {
         .unwrap();
     let average = runs.iter().sum::<f64>() / runs.len() as f64;
     println!("min = {min}, max = {max}, average = {average}");
-    return;*/
+    return;
 
     /*process_identify_command(&Commands::Identify {
         pattern_source_dir: "D:\\Storage\\File Type Samples\\patterns".to_string(),
