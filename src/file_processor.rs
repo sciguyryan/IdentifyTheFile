@@ -55,93 +55,28 @@ const MIN_BYTE_SEQUENCE_LENGTH: usize = 1;
 /// The maximum length of a byte sequence.
 const MAX_BYTE_SEQUENCE_LENGTH: usize = 16;
 
-/// The number of characters that need to be present in a string before parallel processing
-/// should be used for the substring generator.
-const PARALLEL_STRING_THRESHOLD: usize = 16;
-
-#[inline]
-fn all_substrings_over_min_size(string: &str) -> Vec<&str> {
-    let len = string.len();
-    if len < MIN_STRING_LENGTH {
-        return Vec::new();
-    }
-
-    if len < PARALLEL_STRING_THRESHOLD {
-        all_substrings_over_min_size_sequential(string)
-    } else {
-        all_substrings_over_min_size_parallel(string)
-    }
-}
-
-#[inline(always)]
-fn all_substrings_over_min_size_parallel(string: &str) -> Vec<&str> {
-    let len = string.len();
-    (0..len)
-        .into_par_iter()
-        .flat_map(|start| {
-            let start_min_len = start + MIN_STRING_LENGTH;
-            if start_min_len > len {
-                return Vec::new();
-            }
-
-            (start_min_len..=len)
-                .map(|end| unsafe { string.get_unchecked(start..end) })
-                .collect()
-        })
-        .collect()
-}
-
-#[inline(always)]
-fn all_substrings_over_min_size_sequential(string: &str) -> Vec<&str> {
-    let len = string.len();
-    (0..len)
-        .flat_map(|start| {
-            let start_min_len = start + MIN_STRING_LENGTH;
-            if start_min_len > len {
-                return Vec::new();
-            }
-
-            let mut local_substrings = Vec::with_capacity(len - start_min_len + 1);
-            for end in start_min_len..=len {
-                // This block is safe since we can guarantee that we will remain
-                // within the bounds of the vector.
-                unsafe {
-                    local_substrings.push(string.get_unchecked(start..end));
-                }
-            }
-
-            local_substrings
-        })
-        .collect()
-}
-
 #[inline]
 pub fn common_string_sieve(sets: &mut [Vec<&str>]) -> Vec<String> {
     if sets.is_empty() {
         return Vec::new();
     }
 
-    // Find the largest set to maximize the matching potential.
-    sets.sort_unstable_by_key(|b| std::cmp::Reverse(b.len()));
+    sets.sort_unstable_by_key(|b| b.len());
 
-    // Start with the first set as the initial common set.
-    let mut common_strings = unsafe { sets.get_unchecked(0).clone() };
+    let mut common_strings = unsafe { sets.get_unchecked(sets.len() - 1).clone() };
 
-    for set in sets.iter().skip(1) {
-        // If the two strings match, the first will be returned.
-        // Otherwise, the largest common substring will be returned.
+    let last_index = sets.len() - 1;
+    for set in &sets[..last_index] {
         common_strings = common_strings
             .par_iter()
-            .filter_map(|&common_string| {
-                // We're using a normal iterator here since the overhead of a parallel
-                // iterator inside a parallel iterator is more costly than beneficial.
-                set.iter()
-                    .filter_map(|&string| largest_common_substring(string, common_string))
+            .filter_map(|common_string| {
+                set.par_iter()
+                    .filter_map(|string| largest_common_substring(string, common_string))
                     .max_by_key(|s| s.len())
             })
             .collect();
 
-        // Early exit if no common strings remain.
+        // Early exit if no common strings remain
         if common_strings.is_empty() {
             break;
         }
@@ -271,11 +206,10 @@ fn largest_common_substring<'a>(str_1: &'a str, str_2: &str) -> Option<&'a str> 
         return Some(str_1);
     }
 
-    let mut str_1_substrings = all_substrings_over_min_size(str_1);
-    str_1_substrings.sort_unstable_by_key(|b| std::cmp::Reverse(b.len()));
-
-    str_1_substrings
-        .into_iter()
+    (MIN_STRING_LENGTH..=str_1.len())
+        .rev()
+        .flat_map(|size| str_1.as_bytes().windows(size))
+        .map(|window| unsafe { std::str::from_utf8_unchecked(window) })
         .find(|&substr| str_2.contains(substr))
 }
 

@@ -308,7 +308,7 @@ fn process_identify_command(cmd: &Commands) {
             results.truncate(*result_count as usize);
         }
 
-        //print_results(&results, &pattern_handler);
+        print_results(&results, &pattern_handler);
     }
 }
 

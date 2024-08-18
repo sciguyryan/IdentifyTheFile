@@ -79,6 +79,9 @@ impl Pattern {
         let mut all_strings = Vec::with_capacity(files.len());
         let mut byte_distribution: [usize; 256] = [0; 256];
 
+        #[cfg(debug_assertions)]
+        let mut no_strings = vec![];
+
         for file_path in &files {
             let chunk =
                 file_processor::read_file_header_chunk(file_path).expect("failed to read file");
@@ -89,6 +92,14 @@ impl Pattern {
 
             if scan_strings {
                 let strings = file_processor::extract_file_strings(&chunk);
+
+                #[cfg(debug_assertions)]
+                {
+                    if strings.is_empty() {
+                        no_strings.push(file_path);
+                    }
+                }
+
                 all_strings.push(strings);
             }
 
@@ -130,6 +141,13 @@ impl Pattern {
 
         if scan_byte_distribution {
             self.data.average_entropy = utils::calculate_shannon_entropy(&byte_distribution);
+        }
+
+        #[cfg(debug_assertions)]
+        {
+            if scan_strings && no_strings.is_empty() {
+                eprintln!("The following files had no string: {no_strings:#?}");
+            }
         }
 
         // Add the computed information into the struct.

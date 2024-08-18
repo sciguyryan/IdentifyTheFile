@@ -30,7 +30,6 @@ pub fn file_exists<P: AsRef<Path>>(path: P) -> bool {
 }
 
 pub fn get_file_extension<P: AsRef<Path>>(path: P) -> String {
-    // Get the file extension, if it exists.
     if let Some(extension) = path.as_ref().extension() {
         extension.to_string_lossy().to_uppercase()
     } else {
