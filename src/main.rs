@@ -135,6 +135,11 @@ fn main() {
     });
     return;*/
 
+    // TODO - refactor the core matching logic into a separate subcrate.
+    // TODO - this will let me create a mini-matcher compiler that can be used to
+    // TODO - identify a single type of file, outputting the percentage match into the console for use elsewhere.
+    // TODO - the main application would become the full matcher.
+
     let cli = Cli::parse();
 
     match &cli.command {
