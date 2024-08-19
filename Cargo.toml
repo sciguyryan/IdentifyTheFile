@@ -1,8 +1,8 @@
 [workspace]
 resolver = "2"
 
-members = ["itf-core", "identify-the-file"]
-default-members = ["itf-core", "identify-the-file"]
+members = ["itf-core", "identify-the-file", "itf-single"]
+default-members = ["itf-core", "identify-the-file", "itf-single"]
 
 [workspace.dependencies]
 chrono = { version = "0.4.38", features = ["serde"] }
