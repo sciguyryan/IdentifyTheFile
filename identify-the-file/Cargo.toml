@@ -1,0 +1,19 @@
+[package]
+name = "identify-the-file"
+version = "0.1.0"
+authors = ["Ryan Jones-Ward <sciguyryan@gmail.com>"]
+edition = "2021"
+license = "LGPL-2.1-only"
+description = "A command-line file identifcation tool, written in Rust."
+repository = "https://github.com/sciguyryan/IdentifyTheFile"
+homepage = "https://github.com/sciguyryan/IdentifyTheFile"
+
+[dependencies]
+itf-core = { path = "../itf-core" }
+clap.workspace = true
+hashbrown.workspace = true
+prettytable.workspace = true
+rayon.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+walkdir.workspace = true

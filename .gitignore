@@ -1,3 +1,13 @@
-/target
-/samples
-flamegraph*
+identify-the-file/target
+identify-the-file/samples
+identify-the-file/flamegraph*
+
+itf-core/target
+itf-core/samples
+itf-core/flamegraph*
+
+itf-single/target
+itf-single/samples
+itf-single/flamegraph*
+
+target/
