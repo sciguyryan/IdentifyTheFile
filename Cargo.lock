@@ -353,7 +353,6 @@ name = "identify-the-file"
 version = "0.1.0"
 dependencies = [
  "clap",
- "hashbrown",
  "itf-core",
  "prettytable",
  "rayon",
@@ -384,7 +383,6 @@ name = "itf-core"
 version = "0.1.0"
 dependencies = [
  "chrono",
- "clap",
  "hashbrown",
  "rand",
  "rayon",

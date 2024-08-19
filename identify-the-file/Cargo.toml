@@ -11,7 +11,6 @@ homepage = "https://github.com/sciguyryan/IdentifyTheFile"
 [dependencies]
 itf-core = { path = "../itf-core" }
 clap.workspace = true
-hashbrown.workspace = true
 prettytable.workspace = true
 rayon.workspace = true
 serde.workspace = true
