@@ -397,6 +397,7 @@ dependencies = [
 name = "itf-single"
 version = "0.1.0"
 dependencies = [
+ "clap",
  "itf-core",
 ]
 

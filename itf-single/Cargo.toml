@@ -10,3 +10,5 @@ homepage = "https://github.com/sciguyryan/IdentifyTheFile"
 
 [dependencies]
 itf-core = { path = "../itf-core" }
+clap.workspace = true
+
