@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono;
 use hashbrown::HashSet;
 use serde_derive::{Deserialize, Serialize};
 use std::{fs::File, io::Write, path::PathBuf};
@@ -57,7 +57,7 @@ impl Pattern {
         self.submitter_data = PatternSubmitterData {
             scanned_by: scanned_by.to_string(),
             scanned_by_email: scanned_by_email.to_string(),
-            scanned_on: chrono::offset::Utc::now(),
+            scanned_on: chrono::offset::Utc::now().to_string(),
             refined_by: vec![],
             refined_by_email: vec![],
         };
@@ -160,17 +160,6 @@ impl Pattern {
         self.other_data.total_scanned_files = files.len();
     }
 
-    pub fn from_simd_json_str(input: &str) -> Result<Pattern, Box<dyn std::error::Error>> {
-        let mut json_bytes = input.as_bytes().to_vec();
-        let p: Pattern = simd_json::from_slice(&mut json_bytes[..])?;
-        Ok(p)
-    }
-
-    pub fn run_computations(&mut self) {
-        self.compute_confidence_factor();
-        self.compute_max_points();
-    }
-
     fn compute_confidence_factor(&mut self) {
         self.confidence_factor =
             (self.other_data.total_scanned_files as f64).powf(CONFIDENCE_SCALE_FACTOR);
@@ -207,9 +196,26 @@ impl Pattern {
         self.max_points = points.ceil() as usize;
     }
 
+    pub fn from_json_str(input: &str) -> Result<Pattern, Box<dyn std::error::Error>> {
+        let json_bytes = input.as_bytes().to_vec();
+        let p: Pattern = serde_json::from_slice(&json_bytes[..])?;
+        Ok(p)
+    }
+
+    pub fn from_simd_json_str(input: &str) -> Result<Pattern, Box<dyn std::error::Error>> {
+        let mut json_bytes = input.as_bytes().to_vec();
+        let p: Pattern = simd_json::from_slice(&mut json_bytes[..])?;
+        Ok(p)
+    }
+
     fn get_pattern_file_name(&self) -> String {
         let file_name = utils::remove_invalid_file_name(&self.type_data.name);
         file_name.replace(" ", "-") + ".json"
+    }
+
+    pub fn run_computations(&mut self) {
+        self.compute_confidence_factor();
+        self.compute_max_points();
     }
 
     pub fn write(&self, path: &str) -> std::io::Result<PathBuf> {
@@ -286,7 +292,7 @@ pub struct PatternSubmitterData {
     /// The email of the person who performed the initial scan. May be left blank.
     pub scanned_by_email: String,
     /// The timestamp for when the initial scan was performed.
-    pub scanned_on: DateTime<Utc>,
+    pub scanned_on: String,
     /// The list of names of the people that performed refinements on the scan. May be empty.
     pub refined_by: Vec<String>,
     /// The list of email addresses of the people that performed refinements on the scan. May be empty.
@@ -298,7 +304,7 @@ impl Default for PatternSubmitterData {
         Self {
             scanned_by: Default::default(),
             scanned_by_email: Default::default(),
-            scanned_on: chrono::offset::Utc::now(),
+            scanned_on: chrono::offset::Utc::now().to_string(),
             refined_by: Default::default(),
             refined_by_email: Default::default(),
         }

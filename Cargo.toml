@@ -25,4 +25,5 @@ opt-level = 3
 lto = true
 strip = true
 #panic = "abort"
-debug = true
+#debug = true
+#codegen-units = 1

@@ -11,13 +11,13 @@ use itf_core::pattern::Pattern;
 
 // This pattern block will be patched to contain the JSON data.
 const PLACEHOLDER: u8 = 32;
-const PATTERN_BLOCK_SIZE: usize = 16 * 1024;
+const PATTERN_BLOCK_SIZE: usize = 8 * 1024;
 static PATTERN: [u8; PATTERN_BLOCK_SIZE] = [PLACEHOLDER; PATTERN_BLOCK_SIZE];
 
 fn find_sequence(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     haystack
-        .windows(needle.len()) // Create an iterator over all windows of the same length as `needle`
-        .position(|window| window == needle) // Find the first window that matches `needle`
+        .windows(needle.len())
+        .position(|window| window == needle)
 }
 
 fn copy_exe() -> Option<PathBuf> {
@@ -28,7 +28,7 @@ fn copy_exe() -> Option<PathBuf> {
     };
 
     let file_name = exe_path.file_name()?;
-    let new_file_name = file_name.to_string_lossy().replace(".exe", ".single.exe");
+    let new_file_name = file_name.to_string_lossy().replace(".exe", ".patched.exe");
 
     let mut new_file_path = exe_path.clone();
     new_file_path.set_file_name(new_file_name);
@@ -75,8 +75,6 @@ fn main() {
     let index = index.unwrap();
     println!("Block found at index = {index}");
 
-    // TODO - modify the JSON file to strip down some of the bits we don't really need.
-    // TODO - this will save space and mean we can fit larger patterns within the file.
     let json =
         fs::read_to_string("D:\\GitHub\\IdentifyTheFile\\target\\release\\matroska.json").unwrap();
     let mut bytes = json.as_bytes().to_vec();
