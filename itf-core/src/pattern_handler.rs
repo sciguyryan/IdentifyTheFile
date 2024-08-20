@@ -1,9 +1,6 @@
 use std::{fs::File, io::Read, path::Path};
 
-use crate::{
-    pattern::{self, Pattern},
-    utils,
-};
+use crate::{pattern::Pattern, utils};
 
 #[derive(Default)]
 pub struct PatternHandler {
@@ -33,7 +30,7 @@ impl PatternHandler {
         file.read_to_string(&mut contents)
             .expect("failed to read file");
 
-        if let Ok(mut p) = pattern::from_simd_json_str(&contents) {
+        if let Ok(mut p) = Pattern::from_simd_json_str(&contents) {
             p.run_computations();
             self.patterns.push(p);
         }

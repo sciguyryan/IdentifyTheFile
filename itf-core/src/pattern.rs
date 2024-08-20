@@ -8,7 +8,7 @@ use crate::{
     file_processor, utils,
 };
 
-#[derive(Clone, Default, Debug, Serialize, Deserialize)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 pub struct Pattern {
     /// The basic pattern information.
     #[serde(rename = "td")]
@@ -160,6 +160,12 @@ impl Pattern {
         self.other_data.total_scanned_files = files.len();
     }
 
+    pub fn from_simd_json_str(input: &str) -> Result<Pattern, Box<dyn std::error::Error>> {
+        let mut json_bytes = input.as_bytes().to_vec();
+        let p: Pattern = simd_json::from_slice(&mut json_bytes[..])?;
+        Ok(p)
+    }
+
     pub fn run_computations(&mut self) {
         self.compute_confidence_factor();
         self.compute_max_points();
@@ -220,7 +226,7 @@ impl Pattern {
     }
 }
 
-#[derive(Clone, Default, Debug, Serialize, Deserialize)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 pub struct PatternTypeData {
     /// The name of this file type.
     pub name: String,
@@ -236,7 +242,7 @@ pub struct PatternTypeData {
     pub uuid: String,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 pub struct PatternData {
     /// Should we scan for strings in this file type?
     pub scan_strings: bool,
@@ -264,7 +270,7 @@ pub struct PatternData {
     pub average_entropy: f64,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 pub struct PatternOtherData {
     /// The total number of files that have been scanned to build this pattern.
     /// Refinements to the pattern will add to this total.
@@ -273,7 +279,7 @@ pub struct PatternOtherData {
     pub file_format_url: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct PatternSubmitterData {
     /// The name of the person who performed the initial scan. May be left blank.
     pub scanned_by: String,
@@ -297,12 +303,6 @@ impl Default for PatternSubmitterData {
             refined_by_email: Default::default(),
         }
     }
-}
-
-pub fn from_simd_json_str(input: &str) -> Result<Pattern, Box<dyn std::error::Error>> {
-    let mut json_bytes = input.as_bytes().to_vec();
-    let p: Pattern = simd_json::from_slice(&mut json_bytes[..])?;
-    Ok(p)
 }
 
 #[cfg(test)]
