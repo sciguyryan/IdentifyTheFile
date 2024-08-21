@@ -7,11 +7,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use itf_core::{
-    file_point_calculator::FilePointCalculator,
-    file_processor,
-    pattern::Pattern,
-};
+use itf_core::{file_point_calculator::FilePointCalculator, file_processor, pattern::Pattern};
 
 // This pattern block will be patched to contain the JSON data.
 const PLACEHOLDER: u8 = 32;

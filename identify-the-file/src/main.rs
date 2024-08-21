@@ -77,63 +77,6 @@ enum Commands {
 }
 
 fn main() {
-    /*let json =
-        std::fs::read_to_string("D:\\Storage\\File Type Samples\\patterns\\matroska.json").unwrap();
-    let pattern = pattern::from_simd_json_str(&json).unwrap();
-    let fpc = file_point_calculator::FilePointCalculator::compute(
-        &pattern,
-        "D:\\Storage\\File Type Samples\\samples\\mkv\\The World in HDR.mkv",
-    );
-    println!("{}", fpc);
-    return;*/
-
-    /*let files = utils::list_files_of_type("D:\\Downloads\\YouTube", "webm");
-    println!("{}", files.len());
-
-    use std::time::Instant;
-    let mut runs = vec![];
-
-    for _ in 0..10 {
-        let now = Instant::now();
-
-        for file in &files {
-            process_identify_command(&Commands::Identify {
-                pattern_source_dir: "D:\\Storage\\File Type Samples\\patterns".to_string(),
-                target_pattern: "".to_string(),
-                result_count: -1,
-                file: file.clone(),
-            });
-        }
-
-        let elapsed = now.elapsed();
-        runs.push(elapsed.as_secs_f64())
-    }
-
-    let max = runs
-        .iter()
-        .max_by(|x, y| x.partial_cmp(y).unwrap())
-        .unwrap();
-    let min = runs
-        .iter()
-        .min_by(|x, y| x.partial_cmp(y).unwrap())
-        .unwrap();
-    let average = runs.iter().sum::<f64>() / runs.len() as f64;
-    println!("min = {min}, max = {max}, average = {average}");
-    return;*/
-
-    /*process_identify_command(&Commands::Identify {
-        pattern_source_dir: "D:\\Storage\\File Type Samples\\patterns".to_string(),
-        target_pattern: "".to_string(),
-        result_count: -1,
-        file: "D:\\Storage\\File Type Samples\\samples\\webm\\6 - Windows PE File Format Explained [OkX2lIf9YEM].webm".to_string(),
-    });
-    return;*/
-
-    // TODO - refactor the core matching logic into a separate subcrate.
-    // TODO - this will let me create a mini-matcher compiler that can be used to
-    // TODO - identify a single type of file, outputting the percentage match into the console for use elsewhere.
-    // TODO - the main application would become the full matcher.
-
     let cli = Cli::parse();
 
     match &cli.command {
