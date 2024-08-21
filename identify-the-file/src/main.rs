@@ -13,7 +13,7 @@ use std::{env, path::PathBuf};
 #[command(
     name = "Identify The File",
     about = "A CLI application designed to identify files or build patterns to aid with file type identification.",
-    version = "1.0",
+    version = "0.1.0",
     author = "sciguyryan <sciguyryan@gmail.com>"
 )]
 struct Cli {
