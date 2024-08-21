@@ -192,7 +192,7 @@ mod tests_pattern {
             .patterns
             .par_iter()
             .filter_map(|pattern| {
-                let points = FilePointCalculator::compute(pattern, &chunk, path);
+                let points = FilePointCalculator::compute(pattern, &chunk, path, true);
                 if points > 0 {
                     Some(PatternMatch::new(
                         &pattern.type_data.uuid,

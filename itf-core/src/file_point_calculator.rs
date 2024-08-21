@@ -13,7 +13,7 @@ pub const FILE_EXTENSION_POINTS: f64 = 5.0;
 pub struct FilePointCalculator {}
 
 impl FilePointCalculator {
-    pub fn compute(pattern: &Pattern, chunk: &[u8], path: &str) -> usize {
+    pub fn compute(pattern: &Pattern, chunk: &[u8], path: &str, apply_confidence: bool) -> usize {
         let mut frequencies = [0; 256];
 
         if pattern.data.scan_sequences || pattern.data.scan_composition {
@@ -42,7 +42,9 @@ impl FilePointCalculator {
         }
 
         // Scale the relevant points by the confidence factor derived from the total files scanned.
-        points *= pattern.confidence_factor;
+        if apply_confidence {
+            points *= pattern.confidence_factor;
+        }
 
         // The file extension is considered a separate factor and doesn't scale with the number
         // of scanned files.
