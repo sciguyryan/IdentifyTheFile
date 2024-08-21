@@ -100,6 +100,11 @@ fn read_json_file<P: AsRef<Path>>(path: P) -> Vec<u8> {
         return vec![];
     }
 
+    if buffer.len() > PATTERN_BLOCK_SIZE {
+        eprintln!("The pattern file is too large to be embedded. Maximum size = {PATTERN_BLOCK_SIZE}, pattern size = {}", buffer.len());
+        return vec![];
+    }
+
     buffer.resize(PATTERN_BLOCK_SIZE, PLACEHOLDER);
     buffer
 }
