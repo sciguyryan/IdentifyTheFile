@@ -317,10 +317,6 @@ fn process_pattern_command(cmd: &Commands) {
 
         let mut pattern = Pattern::new(name, description, extensions, mimetypes);
         pattern.add_submitter_data(user_name, email);
-
-        use std::time::Instant;
-        let now = Instant::now();
-
         pattern.build_patterns_from_data(
             path,
             extension,
@@ -328,8 +324,6 @@ fn process_pattern_command(cmd: &Commands) {
             !*no_sequences,
             !*no_composition,
         );
-
-        println!("Elapsed: {:.2?}", now.elapsed().as_secs_f64());
 
         if let Some(d) = output_directory {
             if !utils::directory_exists(d) {
