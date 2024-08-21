@@ -63,6 +63,8 @@ fn build_patched_file(pattern_path: &str) {
     };
     println!("Block found at index = {index}... Patching...");
 
+    // TODO - I could compress this file to save space, but I'm not sure if it's
+    // TODO - worth the effort at the moment.
     let bytes = read_json_file(pattern_path);
 
     let patched = patch_file(&new_file_path, &bytes, index);

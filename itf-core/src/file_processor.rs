@@ -63,22 +63,30 @@ pub fn common_string_sieve(sets: &mut [Vec<&str>]) -> Vec<String> {
 
     sets.sort_unstable_by_key(|b| b.len());
 
-    let mut common_strings = unsafe { sets.get_unchecked(sets.len() - 1).clone() };
+    let mut common_strings = unsafe { sets.get_unchecked(sets.len() - 1) }.to_vec();
+    let mut new_common_strings = Vec::with_capacity(common_strings.len());
 
     let last_index = sets.len() - 1;
     for set in &sets[..last_index] {
-        common_strings = common_strings
-            .par_iter()
-            .filter_map(|common_string| {
-                set.par_iter()
-                    .filter_map(|string| largest_common_substring(string, common_string))
-                    .max_by_key(|s| s.len())
-            })
-            .collect();
+        new_common_strings.clear();
 
-        // Early exit if no common strings remain
-        if common_strings.is_empty() {
-            break;
+        for common_string in &common_strings {
+            let max_string = set
+                .par_iter()
+                .filter_map(|string| largest_common_substring(string, common_string))
+                .max_by_key(|s| s.len());
+
+            if let Some(max_string) = max_string {
+                new_common_strings.push(max_string);
+            }
+        }
+
+        if new_common_strings.is_empty() {
+            return Vec::new();
+        }
+
+        unsafe {
+            std::ptr::swap(&mut common_strings, &mut new_common_strings);
         }
     }
 
