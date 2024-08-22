@@ -214,30 +214,11 @@ fn largest_common_substring<'a>(str_1: &'a str, str_2: &str) -> Option<&'a str> 
         return Some(str_1);
     }
 
-    if str_1.is_empty() || str_2.is_empty() {
-        return None;
-    }
-
-    let bytes_1 = str_1.as_bytes();
-    let bytes_2 = str_2.as_bytes();
-    let len = bytes_1.len().min(bytes_2.len());
-
-    for size in (MIN_STRING_LENGTH..=len).rev() {
-        for i in 0..=len - size {
-            unsafe {
-                // This is safe because we'll always be within the bounds of the array.
-                let window = bytes_1.get_unchecked(i..i + size);
-                let window_str = std::str::from_utf8_unchecked(window);
-
-                // If we found a match, we can return immediately.
-                if str_2.contains(window_str) {
-                    return Some(window_str);
-                }
-            }
-        }
-    }
-
-    None
+    (MIN_STRING_LENGTH..=str_1.len())
+        .rev()
+        .flat_map(|size| str_1.as_bytes().windows(size))
+        .map(|window| unsafe { std::str::from_utf8_unchecked(window) })
+        .find(|&substr| str_2.contains(substr))
 }
 
 pub fn read_file_header_chunk(file_path: &str) -> io::Result<Vec<u8>> {

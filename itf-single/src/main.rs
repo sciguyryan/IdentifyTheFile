@@ -1,13 +1,15 @@
 #![crate_name = "itf_single"]
 
+use flate2::Compression;
+use flate2::{read::DeflateDecoder, write::DeflateEncoder};
+use itf_core::{file_point_calculator::FilePointCalculator, file_processor, pattern::Pattern};
+use std::io::Cursor;
 use std::{
     env,
     fs::{self, File, OpenOptions},
     io::{BufReader, Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
 };
-
-use itf_core::{file_point_calculator::FilePointCalculator, file_processor, pattern::Pattern};
 
 // This pattern block will be patched to contain the JSON data.
 const PLACEHOLDER: u8 = 32;
@@ -46,6 +48,16 @@ fn main() {
 }
 
 fn build_patched_file(pattern_path: &str) {
+    let data_bytes = compress_string(&read_json_file(pattern_path));
+    if data_bytes.len() + 8 > PATTERN_BLOCK_SIZE {
+        eprintln!("The pattern file is too large to be embedded. Maximum size = {PATTERN_BLOCK_SIZE}, pattern size = {}", data_bytes.len());
+        return;
+    }
+
+    let mut final_bytes = data_bytes.len().to_le_bytes().to_vec();
+    final_bytes.extend_from_slice(&data_bytes);
+    final_bytes.resize(PATTERN_BLOCK_SIZE, PLACEHOLDER);
+
     // Clone the EXE.
     let new_file_path = if let Some(p) = copy_exe() {
         p
@@ -61,16 +73,18 @@ fn build_patched_file(pattern_path: &str) {
         eprintln!("Unable to identify start of pattern block in executable file.");
         return;
     };
-    println!("Block found at index = {index}... Patching...");
+    println!("Pattern placeholder block found at index = {index}... Patching...");
 
-    // TODO - I could compress this file to save space, but I'm not sure if it's
-    // TODO - worth the effort at the moment.
-    let bytes = read_json_file(pattern_path);
-
-    let patched = patch_file(&new_file_path, &bytes, index);
+    let patched = patch_file(&new_file_path, &final_bytes, index);
     if !patched {
         eprintln!("Unable to patch file.");
     }
+}
+
+fn compress_string(input: &str) -> Vec<u8> {
+    let mut encoder = DeflateEncoder::new(Vec::new(), Compression::default());
+    encoder.write_all(input.as_bytes()).unwrap();
+    encoder.finish().unwrap()
 }
 
 fn compute_match(pattern: &Pattern, target: &str) -> usize {
@@ -109,6 +123,13 @@ fn copy_exe() -> Option<PathBuf> {
     Some(new_file_path)
 }
 
+fn decompress_string(compressed: &[u8]) -> String {
+    let mut decoder = DeflateDecoder::new(Cursor::new(compressed));
+    let mut decompressed = String::new();
+    decoder.read_to_string(&mut decompressed).unwrap();
+    decompressed
+}
+
 fn find_patch_index<P: AsRef<Path>>(path: P) -> Option<usize> {
     if !path.as_ref().exists() {
         return None;
@@ -136,10 +157,10 @@ fn find_sequence(haystack: &[u8], needle: &[u8]) -> Option<usize> {
 // Since we are patching the EXE, we don't want any form of manipulation to this function as it could
 // mess up the data retrieval later.
 #[no_mangle]
-fn get_pattern(raw_pattern: &[u8]) -> Option<Pattern> {
+fn get_pattern(raw_data: &[u8]) -> Option<Pattern> {
     // First, check to see if the data is entirely our placeholder.
     let mut is_unpatched = true;
-    for b in raw_pattern {
+    for b in raw_data {
         if *b != PLACEHOLDER {
             is_unpatched = false;
             break;
@@ -153,10 +174,11 @@ fn get_pattern(raw_pattern: &[u8]) -> Option<Pattern> {
     // Attempt to build a pattern from the presumed JSON data.
     let mut pattern: Option<Pattern> = None;
 
-    if let Ok(str) = String::from_utf8(raw_pattern.to_vec()) {
-        if let Ok(p) = Pattern::from_simd_json_str(&str) {
-            pattern = Some(p);
-        }
+    let data_length_bytes: [u8; 8] = raw_data[0..8].try_into().unwrap();
+    let data_length = usize::from_le_bytes(data_length_bytes);
+    let decompressed = decompress_string(&raw_data[8..data_length + 8]);
+    if let Ok(p) = Pattern::from_simd_json_str(&decompressed) {
+        pattern = Some(p);
     }
 
     // This should never happen since it would mean that the internal data had been incorrect adjusted.
@@ -185,29 +207,23 @@ fn patch_file<P: AsRef<Path>>(path: P, bytes: &[u8], index: usize) -> bool {
     file.write_all(bytes).is_ok()
 }
 
-fn read_json_file<P: AsRef<Path>>(path: P) -> Vec<u8> {
+fn read_json_file<P: AsRef<Path>>(path: P) -> String {
     if !path.as_ref().exists() {
-        return vec![];
+        return String::new();
     }
 
-    let mut buffer = Vec::new();
+    let mut string = String::new();
     let mut file = if let Ok(f) = File::open(path) {
         f
     } else {
-        return vec![];
+        return String::new();
     };
 
-    if file.read_to_end(&mut buffer).is_err() {
-        return vec![];
+    if file.read_to_string(&mut string).is_err() {
+        return String::new();
     }
 
-    if buffer.len() > PATTERN_BLOCK_SIZE {
-        eprintln!("The pattern file is too large to be embedded. Maximum size = {PATTERN_BLOCK_SIZE}, pattern size = {}", buffer.len());
-        return vec![];
-    }
-
-    buffer.resize(PATTERN_BLOCK_SIZE, PLACEHOLDER);
-    buffer
+    string
 }
 
 #[allow(unused)]
