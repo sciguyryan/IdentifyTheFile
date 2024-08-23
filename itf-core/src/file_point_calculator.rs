@@ -3,11 +3,11 @@ use hashbrown::HashSet;
 use crate::{file_processor, pattern::Pattern, utils};
 
 /// The maximum number of points to be awarded for entropy matching.
-pub const MAX_ENTROPY_POINTS: f64 = 15.0;
+pub const MAX_ENTROPY_POINTS: f32 = 15.0;
 /// The amount by which the total file count will be scaled to create the confidence factor.
-pub const CONFIDENCE_SCALE_FACTOR: f64 = 1.0 / 3.0;
+pub const CONFIDENCE_SCALE_FACTOR: f32 = 1.0 / 3.0;
 /// The number of points to be awarded for a file extension match.
-pub const FILE_EXTENSION_POINTS: f64 = 5.0;
+pub const FILE_EXTENSION_POINTS: f32 = 5.0;
 
 #[derive(Default)]
 pub struct FilePointCalculator {}
@@ -54,7 +54,7 @@ impl FilePointCalculator {
     }
 
     #[inline(always)]
-    pub fn test_byte_sequences(pattern: &Pattern, bytes: &[u8]) -> (f64, bool) {
+    pub fn test_byte_sequences(pattern: &Pattern, bytes: &[u8]) -> (f32, bool) {
         if !pattern.data.scan_sequences || pattern.data.sequences.is_empty() {
             return (0.0, true);
         }
@@ -82,11 +82,11 @@ impl FilePointCalculator {
             points += len;
         }
 
-        (points as f64, true)
+        (points as f32, true)
     }
 
     #[inline(always)]
-    pub fn test_entropy_deviation(pattern: &Pattern, frequencies: &[usize; 256]) -> f64 {
+    pub fn test_entropy_deviation(pattern: &Pattern, frequencies: &[usize; 256]) -> f32 {
         let reference_entropy = pattern.data.average_entropy;
         if !pattern.data.scan_composition || reference_entropy == 0.0 {
             return MAX_ENTROPY_POINTS;
@@ -106,7 +106,7 @@ impl FilePointCalculator {
     }
 
     #[inline(always)]
-    pub fn test_file_extension(pattern: &Pattern, path: &str) -> f64 {
+    pub fn test_file_extension(pattern: &Pattern, path: &str) -> f32 {
         let ext = utils::get_file_extension(path);
 
         if pattern.type_data.known_extensions.contains(&ext) {
@@ -117,7 +117,7 @@ impl FilePointCalculator {
     }
 
     #[inline(always)]
-    pub fn test_file_strings(pattern: &Pattern, bytes: &[u8]) -> f64 {
+    pub fn test_file_strings(pattern: &Pattern, bytes: &[u8]) -> f32 {
         if !pattern.data.scan_strings || pattern.data.strings.is_empty() {
             return 0.0;
         }
@@ -129,7 +129,7 @@ impl FilePointCalculator {
             .data
             .strings
             .intersection(&strings)
-            .map(|s| s.len() as f64)
+            .map(|s| s.len() as f32)
             .sum()
     }
 }

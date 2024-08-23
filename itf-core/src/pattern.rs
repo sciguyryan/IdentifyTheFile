@@ -27,7 +27,7 @@ pub struct Pattern {
     pub max_points: usize,
     /// The confidence factor, used in match point calculations.
     #[serde(skip)]
-    pub confidence_factor: f64,
+    pub confidence_factor: f32,
 }
 
 impl Pattern {
@@ -162,7 +162,7 @@ impl Pattern {
 
     fn compute_confidence_factor(&mut self) {
         self.confidence_factor =
-            (self.other_data.total_scanned_files as f64).powf(CONFIDENCE_SCALE_FACTOR);
+            (self.other_data.total_scanned_files as f32).powf(CONFIDENCE_SCALE_FACTOR);
     }
 
     /// Computer the maximum number of points that can be awarded for a perfect match against this pattern.
@@ -172,13 +172,13 @@ impl Pattern {
 
         if self.data.scan_sequences {
             for (_, sequence) in &self.data.sequences {
-                points += sequence.len() as f64;
+                points += sequence.len() as f32;
             }
         }
 
         if self.data.scan_strings {
             for string in &self.data.strings {
-                points += string.len() as f64;
+                points += string.len() as f32;
             }
         }
 
@@ -239,10 +239,10 @@ pub struct PatternTypeData {
     /// The description of this file type.
     pub description: String,
     /// Any known extensions for this file type.
-    #[serde(rename = "extensions")]
+    #[serde(rename = "extensions", default = "default_extensions")]
     pub known_extensions: Vec<String>,
     /// Any known mimetypes for this file type.
-    #[serde(rename = "mimetypes")]
+    #[serde(rename = "mimetypes", default = "default_mimetypes")]
     pub known_mimetypes: Vec<String>,
     /// The UUID of the pattern file.
     pub uuid: String,
@@ -251,29 +251,35 @@ pub struct PatternTypeData {
 #[derive(Clone, Default, Serialize, Deserialize)]
 pub struct PatternData {
     /// Should we scan for strings in this file type?
+    #[serde(default = "default_scan_strings")]
     pub scan_strings: bool,
     /// Any strings that may be associated with this file type.
     /// This field will be empty if string scanning is disabled.
     ///
     /// # Notes
     /// String matches are optional and a missing string will not render the match void.
+    #[serde(default = "default_strings")]
     pub strings: HashSet<String>,
     /// Should we scan for byte sequences?
+    #[serde(default = "default_scan_sequences")]
     pub scan_sequences: bool,
     /// Any positional byte sequences that may be associated with this file type.
     /// This field will be empty if byte sequence scanning is disabled.
     ///
     /// # Notes
     /// Byte sequence matches are not optional - a missing sequence will result in a no-match.
+    #[serde(default = "default_sequences")]
     pub sequences: Vec<(usize, Vec<u8>)>,
     /// Should we scan various aspects of the file's composition?
+    #[serde(default = "default_scan_composition")]
     pub scan_composition: bool,
     /// The average entropy for this file type.
     /// This will be zero if byte distribution scanning is disabled.
     ///
     /// # Notes
     /// Entropy will be evaluated based by its percentage of deviation from the stored average.
-    pub average_entropy: f64,
+    #[serde(default = "default_average_entropy")]
+    pub average_entropy: f32,
 }
 
 #[derive(Clone, Default, Serialize, Deserialize)]
@@ -309,6 +315,38 @@ impl Default for PatternSubmitterData {
             refined_by_email: Default::default(),
         }
     }
+}
+
+fn default_extensions() -> Vec<String> {
+    vec![]
+}
+
+fn default_mimetypes() -> Vec<String> {
+    vec![]
+}
+
+fn default_scan_strings() -> bool {
+    false
+}
+
+fn default_strings() -> HashSet<String> {
+    HashSet::new()
+}
+
+fn default_scan_sequences() -> bool {
+    false
+}
+
+fn default_sequences() -> Vec<(usize, Vec<u8>)> {
+    vec![]
+}
+
+fn default_scan_composition() -> bool {
+    false
+}
+
+fn default_average_entropy() -> f32 {
+    0.0
 }
 
 #[cfg(test)]
@@ -525,12 +563,12 @@ mod tests_pattern {
         let pattern = build_test("entropy", "3", false, false, true);
 
         // Floats are tricky, we need a little bit of fuzziness to properly check them.
-        if !approx_equal(pattern.data.average_entropy, 0f64, 1) {
+        if !approx_equal(pattern.data.average_entropy, 0f32, 1) {
             panic!("expected = 0, actual = {}", pattern.data.average_entropy);
         }
     }
 
-    fn approx_equal(a: f64, b: f64, decimal_places: usize) -> bool {
+    fn approx_equal(a: f32, b: f32, decimal_places: usize) -> bool {
         utils::round_to_dp(a, decimal_places) == utils::round_to_dp(b, decimal_places)
     }
 

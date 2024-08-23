@@ -3,9 +3,9 @@ use std::path::Path;
 use walkdir::WalkDir;
 
 #[inline(always)]
-pub fn calculate_shannon_entropy(frequencies: &[usize; 256]) -> f64 {
+pub fn calculate_shannon_entropy(frequencies: &[usize; 256]) -> f32 {
     // Calculate the total number of bytes in our sample.
-    let total_bytes = frequencies.iter().sum::<usize>() as f64;
+    let total_bytes = frequencies.iter().sum::<usize>() as f32;
 
     // Compute the entropy.
     let mut entropy = 0.0;
@@ -14,7 +14,7 @@ pub fn calculate_shannon_entropy(frequencies: &[usize; 256]) -> f64 {
             continue;
         }
 
-        let probability = count as f64 / total_bytes;
+        let probability = count as f32 / total_bytes;
         entropy -= probability * probability.log2();
     }
 
@@ -75,8 +75,8 @@ pub fn print_byte_sequence_matches(sequences: &[(usize, Vec<u8>)]) {
     println!("{vec:?}");
 }
 
-pub fn round_to_dp(value: f64, decimal_places: usize) -> f64 {
-    let multiplier = 10f64.powi(decimal_places as i32);
+pub fn round_to_dp(value: f32, decimal_places: usize) -> f32 {
+    let multiplier = 10f32.powi(decimal_places as i32);
     (value * multiplier).round() / multiplier
 }
 

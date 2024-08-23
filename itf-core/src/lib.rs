@@ -20,14 +20,14 @@ mod tests_pattern {
 
     struct PatternMatch<'a> {
         pub uuid: &'a str,
-        pub percentage: f64,
+        pub percentage: f32,
     }
 
     impl<'a> PatternMatch<'a> {
         pub fn new(uuid: &'a str, points: usize, max_points: usize) -> Self {
             Self {
                 uuid,
-                percentage: utils::round_to_dp(points as f64 / max_points as f64 * 100.0, 1),
+                percentage: utils::round_to_dp(points as f32 / max_points as f32 * 100.0, 1),
             }
         }
     }
