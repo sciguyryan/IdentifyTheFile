@@ -16,13 +16,13 @@ impl FilePointCalculator {
     pub fn compute(pattern: &Pattern, chunk: &[u8], path: &str, apply_confidence: bool) -> usize {
         let mut frequencies = [0; 256];
 
-        if pattern.data.scan_sequences || pattern.data.scan_composition {
+        if pattern.data.should_scan_sequences() || pattern.data.should_scan_composition() {
             file_processor::count_byte_frequencies(chunk, &mut frequencies);
         }
 
         let mut points = 0.0;
 
-        if pattern.data.scan_sequences {
+        if pattern.data.should_scan_sequences() {
             let (p, success) = Self::test_byte_sequences(pattern, chunk);
 
             // Byte sequence matches, if specified, MUST be present for a file to match the pattern.
@@ -33,11 +33,11 @@ impl FilePointCalculator {
             points += p;
         }
 
-        if pattern.data.scan_strings {
+        if pattern.data.should_scan_strings() {
             points += Self::test_file_strings(pattern, chunk);
         }
 
-        if pattern.data.scan_composition {
+        if pattern.data.should_scan_composition() {
             points += Self::test_entropy_deviation(pattern, &frequencies);
         }
 
@@ -55,7 +55,7 @@ impl FilePointCalculator {
 
     #[inline(always)]
     pub fn test_byte_sequences(pattern: &Pattern, bytes: &[u8]) -> (f32, bool) {
-        if !pattern.data.scan_sequences || pattern.data.sequences.is_empty() {
+        if !pattern.data.should_scan_sequences() || pattern.data.sequences.is_empty() {
             return (0.0, true);
         }
 
@@ -88,7 +88,7 @@ impl FilePointCalculator {
     #[inline(always)]
     pub fn test_entropy_deviation(pattern: &Pattern, frequencies: &[usize; 256]) -> f32 {
         let reference_entropy = pattern.data.average_entropy;
-        if !pattern.data.scan_composition || reference_entropy == 0.0 {
+        if !pattern.data.should_scan_composition() || reference_entropy == 0.0 {
             return MAX_ENTROPY_POINTS;
         }
 
@@ -118,7 +118,7 @@ impl FilePointCalculator {
 
     #[inline(always)]
     pub fn test_file_strings(pattern: &Pattern, bytes: &[u8]) -> f32 {
-        if !pattern.data.scan_strings || pattern.data.strings.is_empty() {
+        if !pattern.data.should_scan_strings() || pattern.data.strings.is_empty() {
             return 0.0;
         }
 

@@ -151,11 +151,8 @@ impl Pattern {
         }
 
         // Add the computed information into the struct.
-        self.data.scan_strings = scan_strings;
         self.data.strings = HashSet::from_iter(common_strings);
-        self.data.scan_sequences = scan_byte_sequences;
         self.data.sequences = common_byte_sequences;
-        self.data.scan_composition = scan_byte_distribution;
 
         self.other_data.total_scanned_files = files.len();
     }
@@ -170,19 +167,19 @@ impl Pattern {
     fn compute_max_points(&mut self) {
         let mut points = 0.0;
 
-        if self.data.scan_sequences {
+        if self.data.should_scan_sequences() {
             for (_, sequence) in &self.data.sequences {
                 points += sequence.len() as f32;
             }
         }
 
-        if self.data.scan_strings {
+        if self.data.should_scan_strings() {
             for string in &self.data.strings {
                 points += string.len() as f32;
             }
         }
 
-        if self.data.scan_composition {
+        if self.data.should_scan_composition() {
             points += MAX_ENTROPY_POINTS;
         }
 
@@ -213,7 +210,7 @@ impl Pattern {
         file_name.replace(" ", "-") + ".json"
     }
 
-    pub fn run_computations(&mut self) {
+    pub fn compute_attributes(&mut self) {
         self.compute_confidence_factor();
         self.compute_max_points();
     }
@@ -237,12 +234,16 @@ pub struct PatternTypeData {
     /// The name of this file type.
     pub name: String,
     /// The description of this file type.
+    #[serde(default = "default_description")]
+    #[serde(skip_serializing_if = "String::is_empty")]
     pub description: String,
     /// Any known extensions for this file type.
     #[serde(rename = "extensions", default = "default_extensions")]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub known_extensions: Vec<String>,
     /// Any known mimetypes for this file type.
     #[serde(rename = "mimetypes", default = "default_mimetypes")]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub known_mimetypes: Vec<String>,
     /// The UUID of the pattern file.
     pub uuid: String,
@@ -250,36 +251,44 @@ pub struct PatternTypeData {
 
 #[derive(Clone, Default, Serialize, Deserialize)]
 pub struct PatternData {
-    /// Should we scan for strings in this file type?
-    #[serde(default = "default_scan_strings")]
-    pub scan_strings: bool,
+    /// Any positional byte sequences that may be associated with this file type.
+    /// This field will be empty if byte sequence scanning was disabled.
+    ///
+    /// # Notes
+    /// Byte sequence matches are -not- optional - a missing sequence will result in an immediate no-match.
+    #[serde(default = "default_sequences")]
+    pub sequences: Vec<(usize, Vec<u8>)>,
     /// Any strings that may be associated with this file type.
-    /// This field will be empty if string scanning is disabled.
+    /// This field will be empty if string scanning was disabled.
     ///
     /// # Notes
     /// String matches are optional and a missing string will not render the match void.
     #[serde(default = "default_strings")]
     pub strings: HashSet<String>,
-    /// Should we scan for byte sequences?
-    #[serde(default = "default_scan_sequences")]
-    pub scan_sequences: bool,
-    /// Any positional byte sequences that may be associated with this file type.
-    /// This field will be empty if byte sequence scanning is disabled.
-    ///
-    /// # Notes
-    /// Byte sequence matches are not optional - a missing sequence will result in a no-match.
-    #[serde(default = "default_sequences")]
-    pub sequences: Vec<(usize, Vec<u8>)>,
-    /// Should we scan various aspects of the file's composition?
-    #[serde(default = "default_scan_composition")]
-    pub scan_composition: bool,
     /// The average entropy for this file type.
-    /// This will be zero if byte distribution scanning is disabled.
+    /// This will be zero if byte distribution scanning was disabled.
     ///
     /// # Notes
     /// Entropy will be evaluated based by its percentage of deviation from the stored average.
     #[serde(default = "default_average_entropy")]
     pub average_entropy: f32,
+}
+
+impl PatternData {
+    #[inline(always)]
+    pub fn should_scan_strings(&self) -> bool {
+        !self.strings.is_empty()
+    }
+
+    #[inline(always)]
+    pub fn should_scan_sequences(&self) -> bool {
+        !self.sequences.is_empty()
+    }
+
+    #[inline(always)]
+    pub fn should_scan_composition(&self) -> bool {
+        self.average_entropy != 0.0
+    }
 }
 
 #[derive(Clone, Default, Serialize, Deserialize)]
@@ -288,6 +297,8 @@ pub struct PatternOtherData {
     /// Refinements to the pattern will add to this total.
     pub total_scanned_files: usize,
     /// A URL documenting the file format.
+    #[serde(default = "default_file_format_url")]
+    #[serde(skip_serializing_if = "String::is_empty")]
     pub file_format_url: String,
 }
 
@@ -300,8 +311,12 @@ pub struct PatternSubmitterData {
     /// The timestamp for when the initial scan was performed.
     pub scanned_on: String,
     /// The list of names of the people that performed refinements on the scan. May be empty.
+    #[serde(default = "default_refined_by")]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub refined_by: Vec<String>,
     /// The list of email addresses of the people that performed refinements on the scan. May be empty.
+    #[serde(default = "default_refined_by_email")]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub refined_by_email: Vec<String>,
 }
 
@@ -317,6 +332,10 @@ impl Default for PatternSubmitterData {
     }
 }
 
+fn default_description() -> String {
+    String::new()
+}
+
 fn default_extensions() -> Vec<String> {
     vec![]
 }
@@ -325,28 +344,28 @@ fn default_mimetypes() -> Vec<String> {
     vec![]
 }
 
-fn default_scan_strings() -> bool {
-    false
-}
-
 fn default_strings() -> HashSet<String> {
     HashSet::new()
-}
-
-fn default_scan_sequences() -> bool {
-    false
 }
 
 fn default_sequences() -> Vec<(usize, Vec<u8>)> {
     vec![]
 }
 
-fn default_scan_composition() -> bool {
-    false
-}
-
 fn default_average_entropy() -> f32 {
     0.0
+}
+
+fn default_file_format_url() -> String {
+    String::new()
+}
+
+fn default_refined_by() -> Vec<String> {
+    vec![]
+}
+
+fn default_refined_by_email() -> Vec<String> {
+    vec![]
 }
 
 #[cfg(test)]
@@ -556,6 +575,27 @@ mod tests_pattern {
                 utils::round_to_dp(pattern.data.average_entropy, 1)
             );
         }
+
+    }
+    #[test]
+    fn test_no_strings_observed() {
+        let pattern = build_test("strings", "8", false, true, false);
+
+        assert!(pattern.data.strings.is_empty(), "strings were set when no strings was specified");
+    }
+
+    #[test]
+    fn test_no_sequences_observed() {
+        let pattern = build_test("strings", "8", true, false, false);
+
+        assert!(pattern.data.sequences.is_empty(), "sequences were set when no sequences was specified");
+    }
+
+    #[test]
+    fn test_no_composition_observed() {
+        let pattern = build_test("strings", "8", true, false, false);
+
+        assert_eq!(pattern.data.average_entropy, 0.0, "average entropy were set when no average entropy was specified");
     }
 
     #[test]

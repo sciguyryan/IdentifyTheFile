@@ -96,7 +96,7 @@ fn compute_match(pattern: &Pattern, target: &str) -> usize {
 
     let mut frequencies = [0; 256];
 
-    if pattern.data.scan_sequences || pattern.data.scan_composition {
+    if pattern.data.should_scan_sequences() || pattern.data.should_scan_composition() {
         file_processor::count_byte_frequencies(&chunk, &mut frequencies);
     }
 
