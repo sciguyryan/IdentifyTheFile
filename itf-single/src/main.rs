@@ -14,7 +14,7 @@ use std::{
 // This pattern block will be patched to contain the JSON data.
 const PLACEHOLDER: u8 = 32;
 const PATTERN_BLOCK_SIZE: usize = 8 * 1024;
-static PATTERN: [u8; PATTERN_BLOCK_SIZE] = [PLACEHOLDER; PATTERN_BLOCK_SIZE];
+const PATTERN: [u8; PATTERN_BLOCK_SIZE] = [PLACEHOLDER; PATTERN_BLOCK_SIZE];
 
 fn main() {
     let pattern = include_bytes!("placeholder.bin");

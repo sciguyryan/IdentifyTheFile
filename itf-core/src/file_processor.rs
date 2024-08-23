@@ -10,6 +10,21 @@ pub const ASCII_CHARACTER_STRING: &str =
 const ASCII_READABLE_CHARACTERS: &[u8] = ASCII_CHARACTER_STRING.as_bytes();
 const ASCII_READABLE_CHARACTERS_SET: [bool; 256] =
     get_ascii_readable_characters_set(ASCII_READABLE_CHARACTERS);
+const ASCII_UPPERCASE_MAP: [char; 256] = generate_uppercase_map();
+
+/// The size of a file chunk to read. Larger is more accurate but slower.
+const FILE_CHUNK_SIZE: usize = 5 * 1024 * 1024; // 5 MB
+/// The size of a byte chunk to be processed in parallel when computing byte distributions.
+const BYTE_COUNT_CHUNK_SIZE: usize = 512; // 512 B
+
+/// The minimum length of a string that will be retained.
+const MIN_STRING_LENGTH: usize = 5;
+/// The maximum length of a string that will be retained.
+pub const MAX_STRING_LENGTH: usize = 64;
+/// The minimum length of a byte sequence.
+const MIN_BYTE_SEQUENCE_LENGTH: usize = 1;
+/// The maximum length of a byte sequence.
+const MAX_BYTE_SEQUENCE_LENGTH: usize = 16;
 
 #[inline(always)]
 const fn get_ascii_readable_characters_set(chars: &[u8]) -> [bool; 256] {
@@ -25,8 +40,6 @@ const fn get_ascii_readable_characters_set(chars: &[u8]) -> [bool; 256] {
     is_readable
 }
 
-const ASCII_UPPERCASE_MAP: [char; 256] = generate_uppercase_map();
-
 #[inline(always)]
 const fn generate_uppercase_map() -> [char; 256] {
     let mut map = ['\0'; 256];
@@ -40,20 +53,6 @@ const fn generate_uppercase_map() -> [char; 256] {
 
     map
 }
-
-/// The size of a file chunk to read. Larger is more accurate but slower.
-const FILE_CHUNK_SIZE: usize = 5 * 1024 * 1024; // 5 MB
-/// The size of a byte chunk to be processed in parallel when computing byte distributions.
-const BYTE_COUNT_CHUNK_SIZE: usize = 512; // 512 B
-
-/// The minimum length of a string that will be retained.
-const MIN_STRING_LENGTH: usize = 5;
-/// The maximum length of a string that will be retained.
-pub const MAX_STRING_LENGTH: usize = 64;
-/// The minimum length of a byte sequence.
-const MIN_BYTE_SEQUENCE_LENGTH: usize = 1;
-/// The maximum length of a byte sequence.
-const MAX_BYTE_SEQUENCE_LENGTH: usize = 16;
 
 #[inline]
 pub fn common_string_sieve(sets: &mut [Vec<&str>]) -> Vec<String> {
@@ -209,16 +208,49 @@ pub fn extract_file_strings(bytes: &[u8]) -> HashSet<String> {
 }
 
 #[inline(always)]
+pub fn find_slice(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    use std::ptr;
+
+    if needle.is_empty() {
+        return Some(0);
+    }
+
+    let needle_len = needle.len();
+    let haystack_len = haystack.len();
+
+    if needle_len > haystack_len {
+        return None;
+    }
+
+    let end = haystack_len - needle_len + 1;
+
+    unsafe {
+        for i in 0..end {
+            if ptr::read_unaligned(haystack.as_ptr().add(i)) == *needle.as_ptr()
+                && haystack.get_unchecked(i..i + needle_len) == needle
+            {
+                return Some(i);
+            }
+        }
+    }
+
+    None
+}
+
+#[inline(always)]
 fn largest_common_substring<'a>(str_1: &'a str, str_2: &str) -> Option<&'a str> {
     if str_1 == str_2 {
         return Some(str_1);
     }
 
-    (MIN_STRING_LENGTH..=str_1.len())
+    let str_1_bytes = str_1.as_bytes();
+    let str_2_bytes = str_2.as_bytes();
+
+    (MIN_STRING_LENGTH..=str_1_bytes.len())
         .rev()
-        .flat_map(|size| str_1.as_bytes().windows(size))
+        .flat_map(|size| str_1_bytes.windows(size))
+        .find(|&seq| find_slice(str_2_bytes, seq).is_some())
         .map(|window| unsafe { std::str::from_utf8_unchecked(window) })
-        .find(|&substr| str_2.contains(substr))
 }
 
 pub fn read_file_header_chunk(file_path: &str) -> io::Result<Vec<u8>> {
