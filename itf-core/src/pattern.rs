@@ -575,27 +575,35 @@ mod tests_pattern {
                 utils::round_to_dp(pattern.data.average_entropy, 1)
             );
         }
-
     }
     #[test]
     fn test_no_strings_observed() {
         let pattern = build_test("strings", "8", false, true, false);
 
-        assert!(pattern.data.strings.is_empty(), "strings were set when no strings was specified");
+        assert!(
+            pattern.data.strings.is_empty(),
+            "strings were set when no strings was specified"
+        );
     }
 
     #[test]
     fn test_no_sequences_observed() {
         let pattern = build_test("strings", "8", true, false, false);
 
-        assert!(pattern.data.sequences.is_empty(), "sequences were set when no sequences was specified");
+        assert!(
+            pattern.data.sequences.is_empty(),
+            "sequences were set when no sequences was specified"
+        );
     }
 
     #[test]
     fn test_no_composition_observed() {
         let pattern = build_test("strings", "8", true, false, false);
 
-        assert_eq!(pattern.data.average_entropy, 0.0, "average entropy were set when no average entropy was specified");
+        assert_eq!(
+            pattern.data.average_entropy, 0.0,
+            "average entropy were set when no average entropy was specified"
+        );
     }
 
     #[test]

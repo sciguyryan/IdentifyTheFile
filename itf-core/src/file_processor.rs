@@ -70,12 +70,11 @@ pub fn common_string_sieve(sets: &mut [Vec<&str>]) -> Vec<String> {
         new_common_strings.clear();
 
         for common_string in &common_strings {
-            let max_string = set
+            if let Some(max_string) = set
                 .par_iter()
                 .filter_map(|string| largest_common_substring(string, common_string))
-                .max_by_key(|s| s.len());
-
-            if let Some(max_string) = max_string {
+                .max_by_key(|s| s.len())
+            {
                 new_common_strings.push(max_string);
             }
         }
@@ -238,6 +237,23 @@ pub fn find_slice(haystack: &[u8], needle: &[u8]) -> Option<usize> {
 }
 
 #[inline(always)]
+fn has_common_elements(seq_1: &[u8], seq_2: &[u8]) -> bool {
+    let mut instances: [bool; 256] = [false; 256];
+
+    for &b in seq_1 {
+        instances[b as usize] = true;
+    }
+
+    for &b in seq_2 {
+        if instances[b as usize] {
+            return true;
+        }
+    }
+
+    false
+}
+
+#[inline(always)]
 fn largest_common_substring<'a>(str_1: &'a str, str_2: &str) -> Option<&'a str> {
     if str_1 == str_2 {
         return Some(str_1);
@@ -245,11 +261,14 @@ fn largest_common_substring<'a>(str_1: &'a str, str_2: &str) -> Option<&'a str> 
 
     let str_1_bytes = str_1.as_bytes();
     let str_2_bytes = str_2.as_bytes();
+    if !has_common_elements(str_1_bytes, str_2_bytes) {
+        return None;
+    }
 
     (MIN_STRING_LENGTH..=str_1_bytes.len())
         .rev()
         .flat_map(|size| str_1_bytes.windows(size))
-        .find(|&seq| find_slice(str_2_bytes, seq).is_some())
+        .find(|seq| find_slice(str_2_bytes, seq).is_some())
         .map(|window| unsafe { std::str::from_utf8_unchecked(window) })
 }
 

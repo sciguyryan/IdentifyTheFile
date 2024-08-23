@@ -11,6 +11,7 @@ homepage = "https://github.com/sciguyryan/IdentifyTheFile"
 [dependencies]
 chrono.workspace = true
 hashbrown.workspace = true
+memchr.workspace = true
 rand.workspace = true
 rayon.workspace = true
 serde.workspace = true

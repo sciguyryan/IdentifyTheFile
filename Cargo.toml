@@ -9,6 +9,7 @@ chrono = { version = "0.4.38", features = ["serde"] }
 clap = { version = "4.5.16", features = ["derive"] }
 flate2 = "1.0.32"
 hashbrown = { version = "0.14.5", features = ["serde", "rayon"] }
+memchr = "2.7.4"
 prettytable = "0.10.0"
 rand = "0.8.5"
 rayon = "1.10.0"
