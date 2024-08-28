@@ -247,7 +247,7 @@ impl Pattern {
 
     /// Derive the name of a pattern based on the stored pattern data.
     fn get_pattern_file_name(&self) -> String {
-        let file_name = utils::remove_invalid_file_name(&self.type_data.name);
+        let file_name = utils::sanitize_file_name(&self.type_data.name);
         file_name.replace(" ", "-") + ".json"
     }
 
@@ -320,16 +320,19 @@ pub struct PatternData {
 }
 
 impl PatternData {
+    /// Should we scan for strings when using this pattern?
     #[inline(always)]
     pub fn should_scan_strings(&self) -> bool {
         !self.strings.is_empty()
     }
 
+    /// Should we scan for byte sequences when using this pattern?
     #[inline(always)]
     pub fn should_scan_sequences(&self) -> bool {
         !self.sequences.is_empty()
     }
 
+    /// Should we scan the file's composition when using this pattern?
     #[inline(always)]
     pub fn should_scan_composition(&self) -> bool {
         self.average_entropy != 0.0
