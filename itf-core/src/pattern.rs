@@ -53,6 +53,12 @@ impl Pattern {
         }
     }
 
+    /// Add the relevant submitter data to the [`Pattern`].
+    ///
+    /// # Arguments
+    ///
+    /// * `scanned_by` - The name of the person that scanned the files. May be empty.
+    /// * `scanned_by_email` - The email of the person that scanned the files. May be empty.
     pub fn add_submitter_data(&mut self, scanned_by: &str, scanned_by_email: &str) {
         self.submitter_data = PatternSubmitterData {
             scanned_by: scanned_by.to_string(),
@@ -63,6 +69,15 @@ impl Pattern {
         };
     }
 
+    /// Build a [`Pattern`] from a target directory and for a specific file type.
+    ///
+    /// # Arguments
+    ///
+    /// * `source_directory` - The target directory containing the sample files.
+    /// * `target_extension` - The target extension for the sample files.
+    /// * `scan_strings` - Should the sample files be scanned for viable strings? This can be performance intensive with a large number of files.
+    /// * `scan_strings` - Should the sample files be scanned for matching byte sequences?
+    /// * `scan_byte_distribution` - Should the sample files have their byte distribution scanned?
     pub fn build_patterns_from_data(
         &mut self,
         source_directory: &str,
@@ -157,6 +172,13 @@ impl Pattern {
         self.other_data.total_scanned_files = files.len();
     }
 
+    /// Compute various attributes once the main object data has been initialized.
+    pub fn compute_attributes(&mut self) {
+        self.compute_confidence_factor();
+        self.compute_max_points();
+    }
+
+    /// Compute the confidence scale factor based on the number of files scanned to build this pattern.
     fn compute_confidence_factor(&mut self) {
         self.confidence_factor =
             (self.other_data.total_scanned_files as f32).powf(CONFIDENCE_SCALE_FACTOR);
@@ -193,28 +215,51 @@ impl Pattern {
         self.max_points = points.ceil() as usize;
     }
 
+    /// Attempt to build a [`Pattern`] from a JSON string.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - The input JSON string.
+    ///
+    /// # Returns
+    ///
+    /// An error if the deserialization failed, otherwise the build [`Patten`] will be returned.
     pub fn from_json_str(input: &str) -> Result<Pattern, Box<dyn std::error::Error>> {
         let json_bytes = input.as_bytes().to_vec();
         let p: Pattern = serde_json::from_slice(&json_bytes[..])?;
         Ok(p)
     }
 
+    /// Attempt to build a [`Pattern`] from a JSON string, using SIMD.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - The input JSON string.
+    ///
+    /// # Returns
+    ///
+    /// An error if the deserialization failed, otherwise the build [`Patten`] will be returned.
     pub fn from_simd_json_str(input: &str) -> Result<Pattern, Box<dyn std::error::Error>> {
         let mut json_bytes = input.as_bytes().to_vec();
         let p: Pattern = simd_json::from_slice(&mut json_bytes[..])?;
         Ok(p)
     }
 
+    /// Derive the name of a pattern based on the stored pattern data.
     fn get_pattern_file_name(&self) -> String {
         let file_name = utils::remove_invalid_file_name(&self.type_data.name);
         file_name.replace(" ", "-") + ".json"
     }
 
-    pub fn compute_attributes(&mut self) {
-        self.compute_confidence_factor();
-        self.compute_max_points();
-    }
-
+    /// Attempt to write a JSON file for the data contained within the pattern.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The input JSON string.
+    ///
+    /// # Returns
+    ///
+    /// An error if the writing failed, otherwise a [`PathBuf`] to the written file will be returned.
     pub fn write(&self, path: &str) -> std::io::Result<PathBuf> {
         let serialized = serde_json::to_string(self).unwrap();
 

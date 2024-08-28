@@ -5,7 +5,7 @@ use std::{
     io::{self, BufReader, Read},
 };
 
-pub const ASCII_CHARACTER_STRING: &str =
+pub(crate) const ASCII_CHARACTER_STRING: &str =
     " !#$+,-./0123456789<=>?ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz";
 const ASCII_READABLE_CHARACTERS: &[u8] = ASCII_CHARACTER_STRING.as_bytes();
 const ASCII_READABLE_CHARACTERS_SET: [bool; 256] =
@@ -55,7 +55,7 @@ const fn generate_uppercase_map() -> [char; 256] {
 }
 
 #[inline]
-pub fn common_string_sieve(sets: &mut [Vec<&str>]) -> Vec<String> {
+pub(crate) fn common_string_sieve(sets: &mut [Vec<&str>]) -> Vec<String> {
     if sets.is_empty() {
         return Vec::new();
     }
@@ -173,7 +173,7 @@ unsafe fn extract_matching_sequences(
 }
 
 #[inline(always)]
-pub fn extract_file_strings(bytes: &[u8]) -> HashSet<String> {
+pub(crate) fn extract_file_strings(bytes: &[u8]) -> HashSet<String> {
     let mut strings = HashSet::with_capacity(128);
     let mut string_buffer = String::with_capacity(MAX_STRING_LENGTH);
     for byte in bytes {
@@ -207,7 +207,7 @@ pub fn extract_file_strings(bytes: &[u8]) -> HashSet<String> {
 }
 
 #[inline(always)]
-pub fn find_slice(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+fn find_slice(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     use std::ptr;
 
     if needle.is_empty() {
@@ -316,7 +316,7 @@ pub fn refine_common_byte_sequences_v2(
     *common_byte_sequences = final_sequences;
 }
 
-pub fn strip_unwanted_sequences(sequences: &mut Vec<(usize, Vec<u8>)>) {
+pub(crate) fn strip_unwanted_sequences(sequences: &mut Vec<(usize, Vec<u8>)>) {
     // Strip any sequences that don't meet the requirements.
     // 1. Any sequences that are below the minimum length requirement. Maximum length enforcement is done elsewhere.
     // 2. Any sequences that are purely null bytes. These are unlikely to be helpful.

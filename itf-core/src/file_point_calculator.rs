@@ -54,7 +54,7 @@ impl FilePointCalculator {
     }
 
     #[inline(always)]
-    pub fn test_byte_sequences(pattern: &Pattern, bytes: &[u8]) -> (f32, bool) {
+    fn test_byte_sequences(pattern: &Pattern, bytes: &[u8]) -> (f32, bool) {
         if !pattern.data.should_scan_sequences() || pattern.data.sequences.is_empty() {
             return (0.0, true);
         }
@@ -86,7 +86,7 @@ impl FilePointCalculator {
     }
 
     #[inline(always)]
-    pub fn test_entropy_deviation(pattern: &Pattern, frequencies: &[usize; 256]) -> f32 {
+    fn test_entropy_deviation(pattern: &Pattern, frequencies: &[usize; 256]) -> f32 {
         let reference_entropy = pattern.data.average_entropy;
         if !pattern.data.should_scan_composition() || reference_entropy == 0.0 {
             return MAX_ENTROPY_POINTS;
@@ -106,7 +106,7 @@ impl FilePointCalculator {
     }
 
     #[inline(always)]
-    pub fn test_file_extension(pattern: &Pattern, path: &str) -> f32 {
+    fn test_file_extension(pattern: &Pattern, path: &str) -> f32 {
         let ext = utils::get_file_extension(path);
 
         if pattern.type_data.known_extensions.contains(&ext) {
@@ -117,7 +117,7 @@ impl FilePointCalculator {
     }
 
     #[inline(always)]
-    pub fn test_file_strings(pattern: &Pattern, bytes: &[u8]) -> f32 {
+    fn test_file_strings(pattern: &Pattern, bytes: &[u8]) -> f32 {
         if !pattern.data.should_scan_strings() || pattern.data.strings.is_empty() {
             return 0.0;
         }
