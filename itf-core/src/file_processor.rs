@@ -26,34 +26,15 @@ const MIN_BYTE_SEQUENCE_LENGTH: usize = 1;
 /// The maximum length of a byte sequence.
 const MAX_BYTE_SEQUENCE_LENGTH: usize = 16;
 
-#[inline(always)]
-const fn get_ascii_readable_characters_set(chars: &[u8]) -> [bool; 256] {
-    let mut is_readable = [false; 256];
-    let mut i = 0;
-
-    while i < chars.len() {
-        let c = chars[i];
-        is_readable[c as usize] = true;
-        i += 1;
-    }
-
-    is_readable
-}
-
-#[inline(always)]
-const fn generate_uppercase_map() -> [char; 256] {
-    let mut map = ['\0'; 256];
-    let mut i = 0;
-
-    while i < 256 {
-        map[i] = ((i as u8) as char).to_ascii_uppercase();
-
-        i += 1;
-    }
-
-    map
-}
-
+/// Sieve a set of strings to retain only those that are present in all of the sets.
+///
+/// # Arguments
+///
+/// * `sets` - A slice of vectors of strings.
+///
+/// # Returns
+///
+/// A vector containing only the strings (or substrings) that are present in every set.
 #[inline]
 pub(crate) fn common_string_sieve(sets: &mut [Vec<&str>]) -> Vec<String> {
     if sets.is_empty() {
@@ -103,6 +84,12 @@ pub(crate) fn common_string_sieve(sets: &mut [Vec<&str>]) -> Vec<String> {
     final_set
 }
 
+/// Count the number of instances of each byte within a slice of u8 values.
+///
+/// # Arguments
+///
+/// * `data` - A slice of bytes.
+/// * `frequencies` - A mutable reference to the array of byte counts.
 #[inline(always)]
 pub fn count_byte_frequencies(data: &[u8], frequencies: &mut [usize; 256]) {
     *frequencies = data
@@ -127,6 +114,17 @@ pub fn count_byte_frequencies(data: &[u8], frequencies: &mut [usize; 256]) {
         );
 }
 
+/// Extract a list of common byte sequences between two slices of u8 values.
+///
+/// # Arguments
+///
+/// * `start_at` - The position within the slice to start the scan.
+/// * `seq_1` - The first u8 slice.
+/// * `seq_2` - The second u8 slice.
+///
+/// # Returns
+///
+/// A vector of tuples containing the position of the match, and the bytes that match.
 #[inline(always)]
 unsafe fn extract_matching_sequences(
     start_at: &usize,
@@ -172,6 +170,15 @@ unsafe fn extract_matching_sequences(
     subsequences
 }
 
+/// Extract valid strings from a slice of u8 values.
+///
+/// # Arguments
+///
+/// * `bytes` - The slice of u8 values.
+///
+/// # Returns
+///
+/// A [`HashSet`] containing the extracted files.
 #[inline(always)]
 pub(crate) fn extract_file_strings(bytes: &[u8]) -> HashSet<String> {
     let mut strings = HashSet::with_capacity(128);
@@ -206,6 +213,16 @@ pub(crate) fn extract_file_strings(bytes: &[u8]) -> HashSet<String> {
     strings
 }
 
+/// Attempt to find a u8 sequence within a slice of u8 values.
+///
+/// # Arguments
+///
+/// * `haystack` - The slice of u8 values within which the sequence should be found.
+/// * `needle` - The slice of u8 values to be located.
+///
+/// # Returns
+///
+/// An option - none if the needle wasn't located or the position of the first match.
 #[inline(always)]
 fn find_slice(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     use std::ptr;
@@ -236,6 +253,48 @@ fn find_slice(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     None
 }
 
+/// Generate an array that indicates whether a byte corresponds to a readable character from our permitted character subset.
+///
+/// # Arguments
+///
+/// * `chars` - A slice of u8 values corresponding to the our permitted characters.
+const fn get_ascii_readable_characters_set(chars: &[u8]) -> [bool; 256] {
+    let mut is_readable = [false; 256];
+    let mut i = 0;
+
+    while i < chars.len() {
+        let c = chars[i];
+        is_readable[c as usize] = true;
+        i += 1;
+    }
+
+    is_readable
+}
+
+/// Generate an uppercase map for the ASCII characters.
+///
+/// # Returns
+///
+/// An array giving the uppercase variants of each byte within the ASCII character set.
+const fn generate_uppercase_map() -> [char; 256] {
+    let mut map = ['\0'; 256];
+    let mut i = 0;
+
+    while i < 256 {
+        map[i] = ((i as u8) as char).to_ascii_uppercase();
+
+        i += 1;
+    }
+
+    map
+}
+
+/// Check whether two sequences have one or more values in common.
+///
+/// # Arguments
+///
+/// * `seq_1` - The first slice of u8 values.
+/// * `seq_2` - The second slice of u8 values.
 #[inline(always)]
 fn has_common_elements(seq_1: &[u8], seq_2: &[u8]) -> bool {
     let mut instances: [bool; 256] = [false; 256];
@@ -253,6 +312,16 @@ fn has_common_elements(seq_1: &[u8], seq_2: &[u8]) -> bool {
     false
 }
 
+/// Attempt to find the largest common substring between two string slices.
+///
+/// # Arguments
+///
+/// * `str_1` - The first string slice.
+/// * `str_2` - The second string slice.
+///
+/// # Returns
+///
+/// An option - none if there was no common substring available, or the largest common substring.
 #[inline(always)]
 fn largest_common_substring<'a>(str_1: &'a str, str_2: &str) -> Option<&'a str> {
     if str_1 == str_2 {
@@ -272,6 +341,15 @@ fn largest_common_substring<'a>(str_1: &'a str, str_2: &str) -> Option<&'a str> 
         .map(|window| unsafe { std::str::from_utf8_unchecked(window) })
 }
 
+/// Attempt to read the header chunk of a file.
+///
+/// # Arguments
+///
+/// * `file_path` - The path to the file.
+///
+/// # Returns
+///
+/// A vector containing the u8 values if the data was successfully read, otherwise an error.
 pub fn read_file_header_chunk(file_path: &str) -> io::Result<Vec<u8>> {
     let file = File::open(file_path)?;
     let filesize = file.metadata()?.len() as usize;
@@ -283,14 +361,17 @@ pub fn read_file_header_chunk(file_path: &str) -> io::Result<Vec<u8>> {
     Ok(buffer)
 }
 
+/// Refine a common byte sequence set, based on a new u8 slice.
+///
+/// # Arguments
+///
+/// * `file_bytes` - A slice of u8 values.
+/// * `common_byte_sequences` - A mutable reference to the vector of tuples giving the position of the sequence and the byte sequence.
 #[inline]
-pub fn refine_common_byte_sequences_v2(
-    file_bytes: &[u8],
-    common_byte_sequences: &mut Vec<(usize, Vec<u8>)>,
-) {
+pub fn refine_common_byte_sequences_v2(file_bytes: &[u8], sequences: &mut Vec<(usize, Vec<u8>)>) {
     let len = file_bytes.len();
-    let mut final_sequences = Vec::with_capacity(common_byte_sequences.len());
-    for (index, test_sequence) in common_byte_sequences.iter().filter(|(i, _)| *i <= len) {
+    let mut final_sequences = Vec::with_capacity(sequences.len());
+    for (index, test_sequence) in sequences.iter().filter(|(i, _)| *i <= len) {
         // Calculate the end index of the read. Should the end index fall outside
         // the bounds of the vector, then we'll read to the end of the vector instead.
         // This check -must- be maintained because, for smaller files, an end index
@@ -313,9 +394,14 @@ pub fn refine_common_byte_sequences_v2(
         }
     }
 
-    *common_byte_sequences = final_sequences;
+    *sequences = final_sequences;
 }
 
+/// Strip sequences that don't conform to our requirements.
+///
+/// # Arguments
+///
+/// * `sequences` - A mutable reference to the vector of tuples giving the position of the sequence and the byte sequence.
 pub(crate) fn strip_unwanted_sequences(sequences: &mut Vec<(usize, Vec<u8>)>) {
     // Strip any sequences that don't meet the requirements.
     // 1. Any sequences that are below the minimum length requirement. Maximum length enforcement is done elsewhere.
