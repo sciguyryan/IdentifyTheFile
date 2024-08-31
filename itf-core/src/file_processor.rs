@@ -161,8 +161,8 @@ unsafe fn extract_matching_sequences(
             if buffer.len() == MAX_BYTE_SEQUENCE_LENGTH {
                 subsequences.push((*start_at + subsequence_start, std::mem::take(&mut buffer)));
 
-                // Immediately begin a new sequence, since we matched here, but we need to start a new sequence
-                // due to the sequence length limitations.
+                // Immediately begin a new sequence, since we are still within a match.
+                // We need to start a new sequence due to the sequence length limitations.
                 subsequence_start = i + 1;
             }
         } else if subsequence_start != usize::MAX {
