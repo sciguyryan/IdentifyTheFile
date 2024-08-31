@@ -92,7 +92,7 @@ pub(crate) fn common_string_sieve(sets: &mut [Vec<&str>]) -> Vec<String> {
 /// * `frequencies` - A mutable reference to the array of byte counts.
 #[inline(always)]
 pub fn count_byte_frequencies(data: &[u8], frequencies: &mut [usize; 256]) {
-    *frequencies = data
+    let mut accumulator = data
         .par_chunks(BYTE_COUNT_CHUNK_SIZE)
         .fold(
             || [0; 256],
@@ -112,6 +112,13 @@ pub fn count_byte_frequencies(data: &[u8], frequencies: &mut [usize; 256]) {
                 acc
             },
         );
+
+    // Add the original counts back into the overall total.
+    for (i, &v) in frequencies.iter().enumerate() {
+        accumulator[i] += v;
+    }
+
+    *frequencies = accumulator
 }
 
 /// Extract a list of common byte sequences between two slices of u8 values.
