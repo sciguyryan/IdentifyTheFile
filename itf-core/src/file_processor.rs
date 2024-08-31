@@ -150,12 +150,13 @@ unsafe fn extract_matching_sequences(
 
     let len = seq_1.len().min(seq_2.len());
     for i in 0..len {
-        if *ptr1.add(i) == *ptr2.add(i) {
+        let inc = *ptr1.add(i);
+        if inc == *ptr2.add(i) {
             if subsequence_start == usize::MAX {
                 subsequence_start = i;
             }
 
-            buffer.push(*ptr1.add(i));
+            buffer.push(inc);
 
             if buffer.len() == MAX_BYTE_SEQUENCE_LENGTH {
                 subsequences.push((*start_at + subsequence_start, std::mem::take(&mut buffer)));
