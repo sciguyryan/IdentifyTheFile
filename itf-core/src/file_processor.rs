@@ -241,7 +241,6 @@ fn find_slice(haystack: &[u8], needle: &[u8]) -> Option<usize> {
 
     let needle_len = needle.len();
     let haystack_len = haystack.len();
-
     if needle_len > haystack_len {
         return None;
     }
