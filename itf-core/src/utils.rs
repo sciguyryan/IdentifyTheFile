@@ -88,7 +88,7 @@ pub fn list_files_of_type<P: AsRef<Path>>(
 /// Generate a random UUID.
 pub fn make_uuid() -> String {
     // Generate a random u128 value.
-    let random: u128 = rand::thread_rng().gen();
+    let random: u128 = rand::rng().random();
 
     // Format the value as a hex string with zero padding to ensure it has 32 characters.
     let hex = format!("{random:032x}");
