@@ -1,7 +1,7 @@
 use chrono;
 use hashbrown::HashSet;
 use serde_derive::{Deserialize, Serialize};
-use std::{fs::File, io::Write, path::PathBuf};
+use std::{fs::File, io::Write, path::{Path, PathBuf}};
 
 use crate::{
     file_point_calculator::{CONFIDENCE_SCALE_FACTOR, FILE_EXTENSION_POINTS, MAX_ENTROPY_POINTS},
@@ -226,7 +226,7 @@ impl Pattern {
     /// An error if the deserialization failed, otherwise the build [`Patten`] will be returned.
     pub fn from_json_str(input: &str) -> Result<Pattern, Box<dyn std::error::Error>> {
         let json_bytes = input.as_bytes().to_vec();
-        let p: Pattern = serde_json::from_slice(&json_bytes[..])?;
+        let p: Pattern = serde_json::from_slice::<Pattern>(&json_bytes[..])?;
         Ok(p)
     }
 
@@ -251,19 +251,25 @@ impl Pattern {
         file_name.replace(" ", "-") + ".json"
     }
 
+    /// Derive the name of a refined pattern based on the stored pattern data.
+    pub fn get_refined_pattern_file_name(&self) -> String {
+        let file_name = utils::sanitize_file_name(&self.type_data.name);
+        file_name.replace(" ", "-") + "-refined.json"
+    }
+
     /// Attempt to write a JSON file for the data contained within the pattern.
     ///
     /// # Arguments
     ///
-    /// * `path` - The input JSON string.
+    /// * `path` - The path to the file containing the pattern's JSON data.
     ///
     /// # Returns
     ///
     /// An error if the writing failed, otherwise a [`PathBuf`] to the written file will be returned.
-    pub fn write(&self, path: &str) -> std::io::Result<PathBuf> {
+    pub fn write<P: AsRef<Path>>(&self, path: P) -> std::io::Result<PathBuf> {
         let serialized = serde_json::to_string(self).unwrap();
 
-        let mut path = PathBuf::from(path);
+        let mut path = PathBuf::from(path.as_ref());
         path.push(self.get_pattern_file_name());
 
         let mut output = File::create(&path)?;

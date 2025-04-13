@@ -73,7 +73,6 @@ enum Commands {
         #[arg(value_name = "OUTPUT_DIR")]
         output_directory: Option<String>,
     },
-    Refine {},
 }
 
 fn main() {
@@ -81,32 +80,29 @@ fn main() {
 
     match &cli.command {
         Commands::Identify {
-            pattern_source_dir: _,
-            target_pattern: _,
-            result_count: _,
-            file: _,
-        } => {
-            process_identify_command(&cli.command);
-        }
+                        pattern_source_dir: _,
+                        target_pattern: _,
+                        result_count: _,
+                        file: _,
+            } => {
+                process_identify_command(&cli.command);
+            }
         Commands::Pattern {
-            user_name: _,
-            email: _,
-            name: _,
-            description: _,
-            known_extensions: _,
-            mimetypes: _,
-            no_strings: _,
-            no_sequences: _,
-            no_composition: _,
-            extension: _,
-            path: _,
-            output_directory: _,
-        } => {
-            process_pattern_command(&cli.command);
-        }
-        Commands::Refine {} => {
-            todo!();
-        }
+                user_name: _,
+                email: _,
+                name: _,
+                description: _,
+                known_extensions: _,
+                mimetypes: _,
+                no_strings: _,
+                no_sequences: _,
+                no_composition: _,
+                extension: _,
+                path: _,
+                output_directory: _,
+            } => {
+                process_pattern_command(&cli.command);
+            }
     }
 }
 

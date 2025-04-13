@@ -62,7 +62,7 @@ impl FilePointCalculator {
         // By default, sequences are sorted by their starting index - largest first.
         // This means that the one with the largest position will be first.
         // In the best case, it might be outside the bounds of the file, thereby
-        // letting is bail the loop early. Though this is likely something that will
+        // letting us bail the loop early. Though this is likely something that will
         // only come up with small files.
         let bytes_len = bytes.len();
         let mut points = 0;
