@@ -92,33 +92,49 @@ pub(crate) fn common_string_sieve(sets: &mut [Vec<&str>]) -> Vec<String> {
 /// * `frequencies` - A mutable reference to the array of byte counts.
 #[inline(always)]
 pub fn count_byte_frequencies(data: &[u8], frequencies: &mut [usize; 256]) {
-    let mut accumulator = data
+    const LANES: usize = 8;
+    let accumulator = data
         .par_chunks(BYTE_COUNT_CHUNK_SIZE)
         .fold(
             || [0; 256],
             |mut local_frequencies, chunk| {
-                for &b in chunk {
-                    local_frequencies[b as usize] += 1;
-                }
+                // Unsafe pointer-based counting to avoid bounds checks.
+                let ptr = local_frequencies.as_mut_ptr();
+                chunk.iter().for_each(|&b| unsafe {
+                    *ptr.add(b as usize) += 1;
+                });
                 local_frequencies
             },
         )
         .reduce(
             || [0; 256],
             |mut acc, local| {
-                for (i, &count) in local.iter().enumerate() {
-                    acc[i] += count;
-                }
+                // Process 8 elements at a time for better cache utilization.
+                let chunks = acc.chunks_exact_mut(LANES);
+                let local_chunks = local.chunks_exact(LANES);
+
+                chunks.zip(local_chunks).for_each(|(acc_chunk, local_chunk)| {
+                    unsafe {
+                        let a = acc_chunk.as_mut_ptr();
+                        let l = local_chunk.as_ptr();
+                        for i in 0..LANES {
+                            *a.add(i) += *l.add(i);
+                        }
+                    }
+                });
+
+                // Process the remaining elements.
                 acc
             },
         );
 
-    // Add the original counts back into the overall total.
-    for (i, &v) in frequencies.iter().enumerate() {
-        accumulator[i] += v;
+    let freq_ptr = frequencies.as_mut_ptr();
+    let acc_ptr = accumulator.as_ptr();
+    unsafe {
+        for i in 0..256 {
+            *freq_ptr.add(i) += *acc_ptr.add(i);
+        }
     }
-
-    *frequencies = accumulator
 }
 
 /// Extract a list of common byte sequences between two slices of u8 values.
