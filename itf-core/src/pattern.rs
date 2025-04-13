@@ -1,7 +1,8 @@
-use chrono;
+use chrono::{self, TimeZone, Utc};
 use hashbrown::HashSet;
-use serde_derive::{Deserialize, Serialize};
-use std::{fs::File, io::Write, path::{Path, PathBuf}};
+use serde::Deserialize;
+use serde_derive::Serialize;
+use std::{fs::File, io::Write, path::{Path, PathBuf}, time::{SystemTime, UNIX_EPOCH}};
 
 use crate::{
     file_point_calculator::{CONFIDENCE_SCALE_FACTOR, FILE_EXTENSION_POINTS, MAX_ENTROPY_POINTS},
@@ -63,7 +64,7 @@ impl Pattern {
         self.submitter_data = PatternSubmitterData {
             scanned_by: scanned_by.to_string(),
             scanned_by_email: scanned_by_email.to_string(),
-            scanned_on: chrono::offset::Utc::now().to_string(),
+            scanned_on: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
             refined_by: vec![],
             refined_by_email: vec![],
         };
@@ -363,7 +364,7 @@ pub struct PatternSubmitterData {
     /// The email of the person who performed the initial scan. May be left blank.
     pub scanned_by_email: String,
     /// The timestamp for when the initial scan was performed.
-    pub scanned_on: String,
+    pub scanned_on: u64,
     /// The list of names of the people that performed refinements on the scan. May be empty.
     #[serde(default = "default_refined_by")]
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -379,10 +380,17 @@ impl Default for PatternSubmitterData {
         Self {
             scanned_by: Default::default(),
             scanned_by_email: Default::default(),
-            scanned_on: chrono::offset::Utc::now().to_string(),
+            scanned_on: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
             refined_by: Default::default(),
             refined_by_email: Default::default(),
         }
+    }
+}
+
+impl PatternSubmitterData {
+    pub fn get_localised_date(&self) -> String {
+        let dt = Utc.timestamp_opt(self.scanned_on as i64, 0).single().ok_or_else(Utc::now).unwrap();
+        dt.format("%Y-%m-%d %H:%M:%S").to_string()
     }
 }
 
