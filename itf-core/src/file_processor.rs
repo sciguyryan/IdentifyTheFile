@@ -43,16 +43,16 @@ pub(crate) fn common_string_sieve(sets: &mut [Vec<&str>]) -> Vec<String> {
 
     sets.sort_unstable_by_key(|b| b.len());
 
-    let mut common_strings = unsafe { sets.get_unchecked(sets.len() - 1) }.to_vec();
+    let last_index = sets.len() - 1;
+    let mut common_strings = unsafe { sets.get_unchecked(last_index) }.clone();
     let mut new_common_strings = Vec::with_capacity(common_strings.len());
 
-    let last_index = sets.len() - 1;
     for set in &sets[..last_index] {
         new_common_strings.clear();
 
         for common_string in &common_strings {
             if let Some(max_string) = set
-                .par_iter()
+                .iter()
                 .filter_map(|string| largest_common_substring(string, common_string))
                 .max_by_key(|s| s.len())
             {
@@ -75,7 +75,7 @@ pub(crate) fn common_string_sieve(sets: &mut [Vec<&str>]) -> Vec<String> {
         .iter()
         .filter(|&&item| {
             !common_strings
-                .iter()
+                .par_iter()
                 .any(|&other| other != item && other.contains(item))
         })
         .map(|s| s.to_string())

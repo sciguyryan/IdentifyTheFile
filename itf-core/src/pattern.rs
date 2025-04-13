@@ -2,7 +2,12 @@ use chrono::{self, TimeZone, Utc};
 use hashbrown::HashSet;
 use serde::Deserialize;
 use serde_derive::Serialize;
-use std::{fs::File, io::Write, path::{Path, PathBuf}, time::{SystemTime, UNIX_EPOCH}};
+use std::{
+    fs::File,
+    io::Write,
+    path::{Path, PathBuf},
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use crate::{
     file_point_calculator::{CONFIDENCE_SCALE_FACTOR, FILE_EXTENSION_POINTS, MAX_ENTROPY_POINTS},
@@ -64,7 +69,10 @@ impl Pattern {
         self.submitter_data = PatternSubmitterData {
             scanned_by: scanned_by.to_string(),
             scanned_by_email: scanned_by_email.to_string(),
-            scanned_on: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
+            scanned_on: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
             refined_by: vec![],
             refined_by_email: vec![],
         };
@@ -380,7 +388,10 @@ impl Default for PatternSubmitterData {
         Self {
             scanned_by: Default::default(),
             scanned_by_email: Default::default(),
-            scanned_on: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
+            scanned_on: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
             refined_by: Default::default(),
             refined_by_email: Default::default(),
         }
@@ -389,7 +400,11 @@ impl Default for PatternSubmitterData {
 
 impl PatternSubmitterData {
     pub fn get_localised_date(&self) -> String {
-        let dt = Utc.timestamp_opt(self.scanned_on as i64, 0).single().ok_or_else(Utc::now).unwrap();
+        let dt = Utc
+            .timestamp_opt(self.scanned_on as i64, 0)
+            .single()
+            .ok_or_else(Utc::now)
+            .unwrap();
         dt.format("%Y-%m-%d %H:%M:%S").to_string()
     }
 }
