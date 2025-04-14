@@ -1,0 +1,1 @@
+{"td":{"name":"MP4","extensions":["MP4"],"uuid":"aa96f9b5-9ae3-bef2-cc08-a580ba3d6f22"},"pd":{"sequences":[[16,[105,115,111,109]]],"regex":[],"strings":["$EDTS","LMVHD"," MDHD","$DINF","FTYPISOM"],"max_entropy":650,"min_entropy":650},"od":{"total_scanned_files":632},"sd":{"scanned_by":"","scanned_by_email":"","scanned_on":1744629393}}

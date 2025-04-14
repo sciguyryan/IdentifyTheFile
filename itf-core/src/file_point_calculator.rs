@@ -89,7 +89,10 @@ impl FilePointCalculator {
     fn test_entropy_deviation(pattern: &Pattern, frequencies: &[usize; 256]) -> f32 {
         let reference_min_entropy = pattern.data.min_entropy;
         let reference_max_entropy = pattern.data.max_entropy;
-        if !pattern.data.should_scan_composition() || reference_min_entropy == 0 || reference_max_entropy == 0 {
+        if !pattern.data.should_scan_composition()
+            || reference_min_entropy == 0
+            || reference_max_entropy == 0
+        {
             return MAX_ENTROPY_POINTS;
         }
 
