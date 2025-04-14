@@ -1,21 +1,19 @@
 [package]
-name = "itf-core"
+name = "itf-library"
 version = "0.1.0"
 authors = ["Ryan Jones-Ward <sciguyryan@gmail.com>"]
 edition = "2021"
 license = "LGPL-2.1-only"
-description = "A pattern-based file identification library, written in Rust."
+description = "The ITF pattern library, written in Rust."
 repository = "https://github.com/sciguyryan/IdentifyTheFile"
 homepage = "https://github.com/sciguyryan/IdentifyTheFile"
+build = "build.rs"
 
 [dependencies]
-chrono.workspace = true
-hashbrown.workspace = true
-rand.workspace = true
-rayon.workspace = true
-regex.workspace = true
-serde.workspace = true
-serde_derive.workspace = true
+lazy_static.workspace = true
 serde_json.workspace = true
-simd-json.workspace = true
-walkdir.workspace = true
+regex.workspace = true
+
+[build-dependencies]
+lazy_static.workspace = true
+serde_json.workspace = true
