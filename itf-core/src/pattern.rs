@@ -1,6 +1,6 @@
 use chrono::{self, TimeZone, Utc};
 use hashbrown::HashSet;
-use regex::Regex;
+use regex::bytes::Regex;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     fs::File,
@@ -10,7 +10,7 @@ use std::{
 };
 
 use crate::{
-    file_point_calculator::{CONFIDENCE_SCALE_FACTOR, FILE_EXTENSION_POINTS, MAX_ENTROPY_POINTS},
+    file_point_calculator::{ENTROPY_POINTS, FILE_EXTENSION_POINTS},
     file_processor, utils,
 };
 
@@ -197,45 +197,35 @@ impl Pattern {
 
     /// Compute various attributes once the main object data has been initialized.
     pub fn compute_attributes(&mut self) {
-        self.compute_confidence_factor();
         self.compute_max_points();
-    }
-
-    /// Compute the confidence scale factor based on the number of files scanned to build this pattern.
-    fn compute_confidence_factor(&mut self) {
-        self.confidence_factor =
-            (self.other_data.total_scanned_files as f32).powf(CONFIDENCE_SCALE_FACTOR);
     }
 
     /// Computer the maximum number of points that can be awarded for a perfect match against this pattern.
     /// The more detailed the pattern, the higher the total points available.
     fn compute_max_points(&mut self) {
-        let mut points = 0.0;
+        let mut points = 0;
 
         if self.data.should_scan_sequences() {
             for (_, sequence) in &self.data.sequences {
-                points += sequence.len() as f32;
+                points += sequence.len();
             }
         }
 
         if self.data.should_scan_strings() {
             for string in &self.data.strings {
-                points += string.len() as f32;
+                points += string.len();
             }
         }
 
         if self.data.should_scan_composition() {
-            points += MAX_ENTROPY_POINTS;
+            points += ENTROPY_POINTS;
         }
-
-        // Scale the relevant points by the confidence factor derived from the total files scanned.
-        points *= self.confidence_factor;
 
         // The file extension is considered a separate factor and doesn't scale with the number
         // of scanned files.
         points += FILE_EXTENSION_POINTS;
 
-        self.max_points = points.ceil() as usize;
+        self.max_points = points;
     }
 
     /// Attempt to build a [`Pattern`] from a JSON string.
@@ -342,7 +332,7 @@ pub struct PatternData {
         deserialize_with = "deserialize_regex_vec",
         serialize_with = "serialize_regex_vec"
     )]
-    pub regex: Vec<Regex>,
+    pub regexes: Vec<Regex>,
     /// Any strings that may be associated with this file type.
     /// This field will be empty if string scanning was disabled.
     ///
@@ -382,6 +372,11 @@ impl PatternData {
     #[inline(always)]
     pub fn should_scan_composition(&self) -> bool {
         self.max_entropy != 0 && self.min_entropy != 0
+    }
+
+    #[inline(always)]
+    pub fn should_scan_regular_expressions(&self) -> bool {
+        !self.regexes.is_empty()
     }
 }
 

@@ -100,7 +100,7 @@ fn compute_match(pattern: &Pattern, target: &str) -> usize {
         file_processor::count_byte_frequencies(&chunk, &mut frequencies);
     }
 
-    FilePointCalculator::compute(pattern, &chunk, target, false)
+    FilePointCalculator::compute(pattern, &chunk, target)
 }
 
 fn copy_exe() -> Option<PathBuf> {
