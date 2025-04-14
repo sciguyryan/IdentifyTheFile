@@ -6,7 +6,6 @@ use itf_core::{
     pattern_handler::PatternHandler, utils,
 };
 use prettytable::{Cell, Row, Table};
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use std::{env, path::PathBuf};
 
 #[derive(Parser)]
@@ -21,6 +20,9 @@ struct Cli {
     command: Commands,
 }
 
+// The default percentage threshold when none was specified.
+const DEFAULT_PERCENTAGE_THRESHOLD: f32 = 100.0 / 3.0;
+
 #[derive(Subcommand)]
 enum Commands {
     Identify {
@@ -32,6 +34,9 @@ enum Commands {
 
         #[arg(short, long, default_value_t = -1)]
         result_count: i32,
+
+        #[arg(short, long, default_value_t = DEFAULT_PERCENTAGE_THRESHOLD)]
+        percentage_threshold: f32,
 
         #[arg(value_name = "FILE")]
         file: String,
@@ -59,10 +64,10 @@ enum Commands {
         no_composition: bool,
 
         #[arg(value_name = "EXT")]
-        extension: String,
+        target_extension: String,
 
         #[arg(value_name = "PATH")]
-        path: String,
+        target_path: String,
 
         #[arg(value_name = "OUTPUT_DIR")]
         output_directory: Option<String>,
@@ -77,6 +82,7 @@ fn main() {
             pattern_source_dir: _,
             target_pattern: _,
             result_count: _,
+            percentage_threshold: _,
             file: _,
         } => {
             process_identify_command(&cli.command);
@@ -89,8 +95,8 @@ fn main() {
             no_strings: _,
             no_sequences: _,
             no_composition: _,
-            extension: _,
-            path: _,
+            target_extension: _,
+            target_path: _,
             output_directory: _,
         } => {
             process_pattern_command(&cli.command);
@@ -127,20 +133,26 @@ fn built_pattern_handler(source_directory: &str, target_pattern: &str) -> Patter
 }
 
 #[inline]
-fn match_patterns<'a>(pattern_handler: &'a PatternHandler, path: &str) -> Vec<PatternMatch<'a>> {
+fn match_patterns<'a>(
+    pattern_handler: &'a PatternHandler,
+    percentage_threshold: f32,
+    path: &str,
+) -> Vec<PatternMatch<'a>> {
     let chunk = file_processor::read_file_header_chunk(path).expect("failed to read sample file");
 
     let mut point_store: Vec<PatternMatch> = pattern_handler
         .patterns
-        .par_iter()
+        .iter()
         .filter_map(|pattern| {
             let points = FilePointCalculator::compute(pattern, &chunk, path);
             if points > 0 {
-                Some(PatternMatch::new(
-                    &pattern.type_data.uuid,
-                    points,
-                    pattern.max_points,
-                ))
+                let pm = PatternMatch::new(&pattern.type_data.uuid, points, pattern.max_points);
+
+                if pm.percentage >= percentage_threshold {
+                    Some(pm)
+                } else {
+                    None
+                }
             } else {
                 None
             }
@@ -194,8 +206,8 @@ fn print_results(results: &[PatternMatch], handler: &PatternHandler) {
         // The values are rounded to 1 d.p., so we don't need to worry about the edge-case
         // floating point issues.
         let colour = match result.percentage {
-            0.0..=33.3 => "Fr",
-            33.4..=66.66 => "Fy",
+            0.0..=33.33 => "Fr",
+            33.34..=66.66 => "Fy",
             66.67..=100.0 => "Fg",
             _ => "Fw",
         };
@@ -217,6 +229,7 @@ fn process_identify_command(cmd: &Commands) {
         pattern_source_dir: source_directory,
         target_pattern,
         result_count,
+        percentage_threshold,
         file,
     } = cmd
     {
@@ -231,7 +244,7 @@ fn process_identify_command(cmd: &Commands) {
             return;
         }
 
-        let mut results = match_patterns(&pattern_handler, file);
+        let mut results = match_patterns(&pattern_handler, *percentage_threshold, file);
 
         // Only retain a set number of results, if specified.
         if *result_count != -1 {
@@ -251,8 +264,8 @@ fn process_pattern_command(cmd: &Commands) {
         no_strings,
         no_sequences,
         no_composition,
-        extension,
-        path,
+        target_extension: extension,
+        target_path: path,
         output_directory,
     } = cmd
     {
