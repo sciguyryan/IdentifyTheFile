@@ -43,7 +43,7 @@ pub fn calculate_shannon_entropy(frequencies: &[usize; 256]) -> f32 {
 ///
 /// # Returns
 ///
-/// The Shannon entropy, expressed as a u16 value between 0 and 800 (fixed rounding to two decial places).
+/// The Shannon entropy, expressed as a u16 value between 0 and 800 (fixed rounding to two decimal places).
 pub fn calculate_shannon_entropy_fixed(frequencies: &[usize; 256]) -> u16 {
     (calculate_shannon_entropy(frequencies) * 100.0).round() as u16
 }

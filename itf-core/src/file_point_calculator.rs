@@ -84,8 +84,8 @@ impl FilePointCalculator {
     fn test_regular_expressions(pattern: &Pattern, bytes: &[u8]) -> usize {
         let mut points = 0;
         for re in &pattern.data.regexes {
-            if let Some(matched) = re.find(bytes) {
-                points += matched.len() + REGULAR_EXPRESSION_EXTRA_POINTS;
+            if re.find(bytes).is_some() {
+                points += re.as_str().len() + REGULAR_EXPRESSION_EXTRA_POINTS;
             }
         }
 

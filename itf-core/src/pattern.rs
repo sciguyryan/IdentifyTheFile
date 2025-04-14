@@ -1,4 +1,3 @@
-use chrono::{self, TimeZone, Utc};
 use hashbrown::HashSet;
 use regex::bytes::Regex;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
@@ -6,11 +5,12 @@ use std::{
     fs::File,
     io::Write,
     path::{Path, PathBuf},
-    time::{SystemTime, UNIX_EPOCH},
 };
 
 use crate::{
-    file_point_calculator::{ENTROPY_POINTS, FILE_EXTENSION_POINTS},
+    file_point_calculator::{
+        ENTROPY_POINTS, FILE_EXTENSION_POINTS, REGULAR_EXPRESSION_EXTRA_POINTS,
+    },
     file_processor, utils,
 };
 
@@ -22,18 +22,9 @@ pub struct Pattern {
     /// The pattern data to be used when performing a scan.
     #[serde(rename = "pd")]
     pub data: PatternData,
-    /// Any other data that may be associated with the pattern.
-    #[serde(rename = "od")]
-    pub other_data: PatternOtherData,
-    /// The submitter information, if specified.
-    #[serde(rename = "sd")]
-    pub submitter_data: PatternSubmitterData,
     // The maximum number of points that can be given by a match against this pattern.
     #[serde(skip)]
     pub max_points: usize,
-    /// The confidence factor, used in match point calculations.
-    #[serde(skip)]
-    pub confidence_factor: f32,
 }
 
 impl Pattern {
@@ -45,37 +36,16 @@ impl Pattern {
     ) -> Self {
         Self {
             type_data: PatternTypeData {
+                uuid: utils::make_uuid(),
                 name: name.to_string(),
                 description: description.to_string(),
                 known_extensions: known_extensions.iter().map(|s| s.to_uppercase()).collect(),
                 known_mimetypes,
-                uuid: utils::make_uuid(),
+                file_format_url: String::new(),
             },
             data: PatternData::default(),
-            other_data: PatternOtherData::default(),
-            submitter_data: PatternSubmitterData::default(),
             max_points: 0,
-            confidence_factor: 0.0,
         }
-    }
-
-    /// Add the relevant submitter data to the [`Pattern`].
-    ///
-    /// # Arguments
-    ///
-    /// * `scanned_by` - The name of the person that scanned the files. May be empty.
-    /// * `scanned_by_email` - The email of the person that scanned the files. May be empty.
-    pub fn add_submitter_data(&mut self, scanned_by: &str, scanned_by_email: &str) {
-        self.submitter_data = PatternSubmitterData {
-            scanned_by: scanned_by.to_string(),
-            scanned_by_email: scanned_by_email.to_string(),
-            scanned_on: SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
-            refined_by: vec![],
-            refined_by_email: vec![],
-        };
     }
 
     /// Build a [`Pattern`] from a target directory and for a specific file type.
@@ -191,8 +161,6 @@ impl Pattern {
         // Add the computed information into the struct.
         self.data.strings = HashSet::from_iter(common_strings);
         self.data.sequences = common_byte_sequences;
-
-        self.other_data.total_scanned_files = files.len();
     }
 
     /// Compute various attributes once the main object data has been initialized.
@@ -214,6 +182,12 @@ impl Pattern {
         if self.data.should_scan_strings() {
             for string in &self.data.strings {
                 points += string.len();
+            }
+        }
+
+        if self.data.should_scan_regular_expressions() {
+            for regex in &self.data.regexes {
+                points += regex.as_str().len() + REGULAR_EXPRESSION_EXTRA_POINTS;
             }
         }
 
@@ -264,12 +238,6 @@ impl Pattern {
         file_name.replace(" ", "-") + ".json"
     }
 
-    /// Derive the name of a refined pattern based on the stored pattern data.
-    pub fn get_refined_pattern_file_name(&self) -> String {
-        let file_name = utils::sanitize_file_name(&self.type_data.name);
-        file_name.replace(" ", "-") + "-refined.json"
-    }
-
     /// Attempt to write a JSON file for the data contained within the pattern.
     ///
     /// # Arguments
@@ -295,6 +263,8 @@ impl Pattern {
 
 #[derive(Clone, Default, Serialize, Deserialize)]
 pub struct PatternTypeData {
+    /// The UUID of the pattern file.
+    pub uuid: String,
     /// The name of this file type.
     pub name: String,
     /// The description of this file type.
@@ -309,8 +279,10 @@ pub struct PatternTypeData {
     #[serde(rename = "mimetypes", default = "default_mimetypes")]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub known_mimetypes: Vec<String>,
-    /// The UUID of the pattern file.
-    pub uuid: String,
+    /// A URL documenting the file format.
+    #[serde(default = "default_file_format_url")]
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub file_format_url: String,
 }
 
 #[derive(Clone, Default, Serialize, Deserialize)]
@@ -380,61 +352,6 @@ impl PatternData {
     }
 }
 
-#[derive(Clone, Default, Serialize, Deserialize)]
-pub struct PatternOtherData {
-    /// The total number of files that have been scanned to build this pattern.
-    /// Refinements to the pattern will add to this total.
-    pub total_scanned_files: usize,
-    /// A URL documenting the file format.
-    #[serde(default = "default_file_format_url")]
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub file_format_url: String,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub struct PatternSubmitterData {
-    /// The name of the person who performed the initial scan. May be left blank.
-    pub scanned_by: String,
-    /// The email of the person who performed the initial scan. May be left blank.
-    pub scanned_by_email: String,
-    /// The timestamp for when the initial scan was performed.
-    pub scanned_on: u64,
-    /// The list of names of the people that performed refinements on the scan. May be empty.
-    #[serde(default = "default_refined_by")]
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub refined_by: Vec<String>,
-    /// The list of email addresses of the people that performed refinements on the scan. May be empty.
-    #[serde(default = "default_refined_by_email")]
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub refined_by_email: Vec<String>,
-}
-
-impl Default for PatternSubmitterData {
-    fn default() -> Self {
-        Self {
-            scanned_by: Default::default(),
-            scanned_by_email: Default::default(),
-            scanned_on: SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
-            refined_by: Default::default(),
-            refined_by_email: Default::default(),
-        }
-    }
-}
-
-impl PatternSubmitterData {
-    pub fn get_localised_date(&self) -> String {
-        let dt = Utc
-            .timestamp_opt(self.scanned_on as i64, 0)
-            .single()
-            .ok_or_else(Utc::now)
-            .unwrap();
-        dt.format("%Y-%m-%d %H:%M:%S").to_string()
-    }
-}
-
 fn default_description() -> String {
     String::new()
 }
@@ -465,14 +382,6 @@ fn default_entropy() -> u16 {
 
 fn default_file_format_url() -> String {
     String::new()
-}
-
-fn default_refined_by() -> Vec<String> {
-    vec![]
-}
-
-fn default_refined_by_email() -> Vec<String> {
-    vec![]
 }
 
 fn serialize_regex_vec<S>(regexes: &[Regex], serializer: S) -> Result<S::Ok, S::Error>

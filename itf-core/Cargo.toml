@@ -9,7 +9,6 @@ repository = "https://github.com/sciguyryan/IdentifyTheFile"
 homepage = "https://github.com/sciguyryan/IdentifyTheFile"
 
 [dependencies]
-chrono.workspace = true
 hashbrown.workspace = true
 rand.workspace = true
 rayon.workspace = true

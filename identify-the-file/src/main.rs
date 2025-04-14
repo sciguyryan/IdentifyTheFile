@@ -38,12 +38,6 @@ enum Commands {
     },
     Pattern {
         #[arg(short, long, default_value = "")]
-        user_name: String,
-
-        #[arg(short, long, default_value = "")]
-        email: String,
-
-        #[arg(short, long, default_value = "")]
         name: String,
 
         #[arg(short, long, default_value = "")]
@@ -88,8 +82,6 @@ fn main() {
             process_identify_command(&cli.command);
         }
         Commands::Pattern {
-            user_name: _,
-            email: _,
             name: _,
             description: _,
             known_extensions: _,
@@ -252,8 +244,6 @@ fn process_identify_command(cmd: &Commands) {
 
 fn process_pattern_command(cmd: &Commands) {
     if let Commands::Pattern {
-        user_name,
-        email,
         name,
         description,
         known_extensions,
@@ -312,7 +302,6 @@ fn process_pattern_command(cmd: &Commands) {
         };
 
         let mut pattern = Pattern::new(name, description, extensions, mimetypes);
-        pattern.add_submitter_data(user_name, email);
 
         let now = std::time::Instant::now();
 
