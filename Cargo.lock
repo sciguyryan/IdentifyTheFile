@@ -397,7 +397,6 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "itf-core",
- "itf-library",
  "prettytable",
  "rayon",
  "serde",
@@ -428,6 +427,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "hashbrown",
+ "lazy_static",
  "rand",
  "rayon",
  "regex",
@@ -436,15 +436,6 @@ dependencies = [
  "serde_json",
  "simd-json",
  "walkdir",
-]
-
-[[package]]
-name = "itf-library"
-version = "0.1.0"
-dependencies = [
- "lazy_static",
- "regex",
- "serde_json",
 ]
 
 [[package]]

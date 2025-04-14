@@ -10,7 +10,6 @@ homepage = "https://github.com/sciguyryan/IdentifyTheFile"
 
 [dependencies]
 itf-core = { path = "../itf-core" }
-itf-library = { path = "../itf-library" }
 clap.workspace = true
 prettytable.workspace = true
 rayon.workspace = true

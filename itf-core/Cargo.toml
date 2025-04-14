@@ -7,10 +7,12 @@ license = "LGPL-2.1-only"
 description = "A pattern-based file identification library, written in Rust."
 repository = "https://github.com/sciguyryan/IdentifyTheFile"
 homepage = "https://github.com/sciguyryan/IdentifyTheFile"
+build = "build.rs"
 
 [dependencies]
 chrono.workspace = true
 hashbrown.workspace = true
+lazy_static.workspace = true
 rand.workspace = true
 rayon.workspace = true
 regex.workspace = true
@@ -19,3 +21,9 @@ serde_derive.workspace = true
 serde_json.workspace = true
 simd-json.workspace = true
 walkdir.workspace = true
+
+
+[build-dependencies]
+lazy_static.workspace = true
+serde.workspace = true
+serde_json.workspace = true

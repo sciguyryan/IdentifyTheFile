@@ -1,8 +1,12 @@
 #![crate_name = "itf_core"]
 
+include!(concat!(env!("OUT_DIR"), "/embedded_rules.rs"));
+
+pub mod embedded_rule;
 pub mod file_point_calculator;
 pub mod file_processor;
 pub mod pattern;
+#[cfg(test)]
 pub mod pattern_handler;
 #[cfg(test)]
 mod test_utils;

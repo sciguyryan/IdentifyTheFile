@@ -3,7 +3,7 @@
 use clap::{Parser, Subcommand};
 use itf_core::{
     file_point_calculator::FilePointCalculator, file_processor, pattern::Pattern,
-    pattern_handler::PatternHandler, utils,
+    utils,
 };
 use prettytable::{Cell, Row, Table};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
@@ -24,11 +24,8 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     Identify {
-        #[arg(short, long, default_value = "", value_name = "DIR")]
-        pattern_source_dir: String,
-
-        #[arg(short, long, default_value = "", value_name = "example.mkv.json")]
-        target_pattern: String,
+        #[arg(short, long, default_value = "", value_name = "MP4")]
+        target_pattern_name: String,
 
         #[arg(short, long, default_value_t = -1)]
         result_count: i32,
@@ -80,8 +77,7 @@ fn main() {
 
     match &cli.command {
         Commands::Identify {
-            pattern_source_dir: _,
-            target_pattern: _,
+            target_pattern_name: _,
             result_count: _,
             file: _,
         } => {
@@ -106,36 +102,8 @@ fn main() {
     }
 }
 
-fn built_pattern_handler(source_directory: &str, target_pattern: &str) -> PatternHandler {
-    let mut pattern_handler = PatternHandler::default();
-
-    // By default we'll look at the path /patterns/ relative to the path of the executable.
-    // If the source path is specified then we will attempt to load the patterns from there instead.
-    let pattern_source = if source_directory.is_empty() {
-        if let Ok(p) = env::current_dir() {
-            let mut temp = p.clone();
-            temp.push("patterns");
-            temp
-        } else {
-            eprintln!("Unable to get the current working directory, and no definition source specified. Unable to continue.");
-            return pattern_handler;
-        }
-    } else {
-        PathBuf::from(source_directory)
-    };
-
-    if !utils::directory_exists(&pattern_source) {
-        eprintln!("The specified pattern source directory doesn't exist. Unable to continue.");
-        return pattern_handler;
-    }
-
-    pattern_handler.read(pattern_source, target_pattern);
-
-    pattern_handler
-}
-
 #[inline]
-fn match_patterns<'a>(pattern_handler: &'a PatternHandler, path: &str) -> Vec<PatternMatch<'a>> {
+fn match_patterns<'a>(path: &str) -> Vec<PatternMatch<'a>> {
     let chunk = file_processor::read_file_header_chunk(path).expect("failed to read sample file");
 
     let mut point_store: Vec<PatternMatch> = pattern_handler
@@ -222,7 +190,6 @@ fn print_results(results: &[PatternMatch], handler: &PatternHandler) {
 
 fn process_identify_command(cmd: &Commands) {
     if let Commands::Identify {
-        pattern_source_dir: source_directory,
         target_pattern,
         result_count,
         file,
