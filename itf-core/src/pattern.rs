@@ -1,7 +1,7 @@
 use chrono::{self, TimeZone, Utc};
 use hashbrown::HashSet;
-use regex::Regex;
-use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+use serde::Deserialize;
+use serde_derive::Serialize;
 use std::{
     fs::File,
     io::Write,
@@ -332,17 +332,6 @@ pub struct PatternData {
     /// Byte sequence matches are -not- optional - a missing sequence will result in an immediate no-match.
     #[serde(default = "default_sequences")]
     pub sequences: Vec<(usize, Vec<u8>)>,
-    /// Any regular expressions that may be associated with this file type.
-    /// This field will be empty if regex scanning was disabled.
-    ///
-    /// # Notes
-    /// Request expression matches are -not- optional - a missing sequence will result in an immediate no-match.
-    #[serde(
-        default = "default_regex",
-        deserialize_with = "deserialize_regex_vec",
-        serialize_with = "serialize_regex_vec"
-    )]
-    pub regex: Vec<Regex>,
     /// Any strings that may be associated with this file type.
     /// This field will be empty if string scanning was disabled.
     ///
@@ -350,17 +339,12 @@ pub struct PatternData {
     /// String matches are optional and a missing string will not render the match void.
     #[serde(default = "default_strings")]
     pub strings: HashSet<String>,
-    /// Any strings that may be associated with this file type.
-    /// This field will be empty if string scanning was disabled.
-    ///
-    /// # Notes
-    /// String matches are optional and a missing string will not render the match void.
     /// The maximum entropy recorded for this file type.
-    /// This will be zero if byte distribution scanning was disabled.
+    /// This will be zero if byte distribution scanning was disabled..
     #[serde(default = "default_entropy")]
     pub max_entropy: u16,
     /// The maximum entropy recorded for this file type.
-    /// This will be zero if byte distribution scanning was disabled.
+    /// This will be zero if byte distribution scanning was disabled..
     #[serde(default = "default_entropy")]
     pub min_entropy: u16,
 }
@@ -460,10 +444,6 @@ fn default_sequences() -> Vec<(usize, Vec<u8>)> {
     vec![]
 }
 
-fn default_regex() -> Vec<Regex> {
-    vec![]
-}
-
 fn default_entropy() -> u16 {
     0
 }
@@ -478,25 +458,6 @@ fn default_refined_by() -> Vec<String> {
 
 fn default_refined_by_email() -> Vec<String> {
     vec![]
-}
-
-fn serialize_regex_vec<S>(regexes: &[Regex], serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    let patterns: Vec<&str> = regexes.iter().map(|r| r.as_str()).collect();
-    patterns.serialize(serializer)
-}
-
-fn deserialize_regex_vec<'de, D>(deserializer: D) -> Result<Vec<Regex>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let raw_vec: Vec<String> = Vec::deserialize(deserializer)?;
-    raw_vec
-        .into_iter()
-        .map(|s| Regex::new(&s).map_err(|e| de::Error::custom(e.to_string())))
-        .collect()
 }
 
 #[cfg(test)]

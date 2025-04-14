@@ -113,15 +113,15 @@ pub fn count_byte_frequencies(data: &[u8], frequencies: &mut [usize; 256]) {
                 let chunks = acc.chunks_exact_mut(LANES);
                 let local_chunks = local.chunks_exact(LANES);
 
-                chunks
-                    .zip(local_chunks)
-                    .for_each(|(acc_chunk, local_chunk)| unsafe {
+                chunks.zip(local_chunks).for_each(|(acc_chunk, local_chunk)| {
+                    unsafe {
                         let a = acc_chunk.as_mut_ptr();
                         let l = local_chunk.as_ptr();
                         for i in 0..LANES {
                             *a.add(i) += *l.add(i);
                         }
-                    });
+                    }
+                });
 
                 // Process the remaining elements.
                 acc
