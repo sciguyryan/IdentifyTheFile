@@ -241,7 +241,7 @@ fn process_identify_command(cmd: &Commands) {
 
         let mut results = match_patterns(&pattern_handler, file);
 
-        // Only retail a set number of results, if specified.
+        // Only retain a set number of results, if specified.
         if *result_count != -1 {
             results.truncate(*result_count as usize);
         }
@@ -314,7 +314,7 @@ fn process_pattern_command(cmd: &Commands) {
         let mut pattern = Pattern::new(name, description, extensions, mimetypes);
         pattern.add_submitter_data(user_name, email);
 
-        //let now = std::time::Instant::now();
+        let now = std::time::Instant::now();
 
         pattern.build_patterns_from_data(
             path,
@@ -324,7 +324,7 @@ fn process_pattern_command(cmd: &Commands) {
             !*no_composition,
         );
 
-        //println!("{}", now.elapsed().as_secs_f64());
+        println!("{}", now.elapsed().as_secs_f64());
 
         if let Some(d) = output_directory {
             if !utils::directory_exists(d) {

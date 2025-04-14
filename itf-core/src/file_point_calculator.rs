@@ -87,22 +87,19 @@ impl FilePointCalculator {
 
     #[inline(always)]
     fn test_entropy_deviation(pattern: &Pattern, frequencies: &[usize; 256]) -> f32 {
-        let reference_entropy = pattern.data.average_entropy;
-        if !pattern.data.should_scan_composition() || reference_entropy == 0.0 {
+        let reference_min_entropy = pattern.data.min_entropy;
+        let reference_max_entropy = pattern.data.max_entropy;
+        if !pattern.data.should_scan_composition() || reference_min_entropy == 0 || reference_max_entropy == 0 {
             return MAX_ENTROPY_POINTS;
         }
 
         // Compute the entropy for the target data block.
-        let target_entropy = utils::calculate_shannon_entropy(frequencies);
-        let absolute_diff = (reference_entropy - target_entropy).abs();
-        let percentage_diff = if reference_entropy > 0.0 {
-            (absolute_diff / reference_entropy) * 100.0
-        } else {
-            0.0
-        };
+        let target_entropy = utils::calculate_shannon_entropy_fixed(frequencies);
+        if target_entropy < reference_min_entropy || target_entropy > reference_max_entropy {
+            return 0.0;
+        }
 
-        // Scale the points linearly between 0 and MAX_ENTROPY_POINTS based on the differences.
-        MAX_ENTROPY_POINTS * (1.0 - percentage_diff / 100.0)
+        MAX_ENTROPY_POINTS
     }
 
     #[inline(always)]

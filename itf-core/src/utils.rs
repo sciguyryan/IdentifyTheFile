@@ -35,6 +35,19 @@ pub fn calculate_shannon_entropy(frequencies: &[usize; 256]) -> f32 {
     entropy
 }
 
+/// Calculate the Shannon entropy for a block of bytes.
+///
+/// # Arguments
+///
+/// * `frequencies` - An array containing the byte frequencies.
+///
+/// # Returns
+///
+/// The Shannon entropy, expressed as a u16 value between 0 and 800 (fixed rounding to two decial places).
+pub fn calculate_shannon_entropy_fixed(frequencies: &[usize; 256]) -> u16 {
+    (calculate_shannon_entropy(frequencies) * 100.0).round() as u16
+}
+
 /// Check that a directory exist.
 pub fn directory_exists<P: AsRef<Path>>(path: P) -> bool {
     path.as_ref().is_dir()

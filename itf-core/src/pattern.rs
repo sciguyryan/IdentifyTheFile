@@ -106,6 +106,9 @@ impl Pattern {
         #[cfg(debug_assertions)]
         let mut no_strings = vec![];
 
+        let mut min_entropy = u16::MAX;
+        let mut max_entropy = u16::MIN;
+
         for file_path in &files {
             let chunk =
                 file_processor::read_file_header_chunk(file_path).expect("failed to read file");
@@ -164,7 +167,13 @@ impl Pattern {
         }
 
         if scan_byte_distribution {
-            self.data.average_entropy = utils::calculate_shannon_entropy(&byte_distribution);
+            let entropy = utils::calculate_shannon_entropy_fixed(&byte_distribution);
+            if entropy < min_entropy {
+                min_entropy = entropy;
+            }
+            if entropy > max_entropy {
+                max_entropy = entropy;
+            }
         }
 
         #[cfg(debug_assertions)]
@@ -172,6 +181,11 @@ impl Pattern {
             if scan_strings && no_strings.is_empty() {
                 eprintln!("The following files had no string: {no_strings:#?}");
             }
+        }
+
+        if scan_byte_distribution {
+            self.data.max_entropy = max_entropy;
+            self.data.min_entropy = min_entropy;
         }
 
         // Add the computed information into the struct.
@@ -325,13 +339,14 @@ pub struct PatternData {
     /// String matches are optional and a missing string will not render the match void.
     #[serde(default = "default_strings")]
     pub strings: HashSet<String>,
-    /// The average entropy for this file type.
-    /// This will be zero if byte distribution scanning was disabled.
-    ///
-    /// # Notes
-    /// Entropy will be evaluated based by its percentage of deviation from the stored average.
-    #[serde(default = "default_average_entropy")]
-    pub average_entropy: f32,
+    /// The maximum entropy recorded for this file type.
+    /// This will be zero if byte distribution scanning was disabled..
+    #[serde(default = "default_entropy")]
+    pub max_entropy: u16,
+    /// The maximum entropy recorded for this file type.
+    /// This will be zero if byte distribution scanning was disabled..
+    #[serde(default = "default_entropy")]
+    pub min_entropy: u16,
 }
 
 impl PatternData {
@@ -350,7 +365,7 @@ impl PatternData {
     /// Should we scan the file's composition when using this pattern?
     #[inline(always)]
     pub fn should_scan_composition(&self) -> bool {
-        self.average_entropy != 0.0
+        self.max_entropy != 0 && self.min_entropy != 0
     }
 }
 
@@ -429,8 +444,8 @@ fn default_sequences() -> Vec<(usize, Vec<u8>)> {
     vec![]
 }
 
-fn default_average_entropy() -> f32 {
-    0.0
+fn default_entropy() -> u16 {
+    0
 }
 
 fn default_file_format_url() -> String {
@@ -451,7 +466,7 @@ mod tests_pattern {
 
     use hashbrown::HashSet;
 
-    use crate::{test_utils, utils};
+    use crate::test_utils;
 
     use super::Pattern;
 
@@ -632,26 +647,16 @@ mod tests_pattern {
     fn test_entropy_1() {
         let pattern = build_test("entropy", "1", false, false, true);
 
-        // Floats are tricky, we need a little bit of fuzziness to properly check them.
-        if !approx_equal(pattern.data.average_entropy, 4.3, 1) {
-            panic!(
-                "expected = 4.3, actual = {}",
-                utils::round_to_dp(pattern.data.average_entropy, 1)
-            );
-        }
+        assert_eq!(pattern.data.max_entropy, 427);
+        assert_eq!(pattern.data.min_entropy, 427);
     }
 
     #[test]
     fn test_entropy_2() {
         let pattern = build_test("entropy", "2", false, false, true);
 
-        // Floats are tricky, we need a little bit of fuzziness to properly check them.
-        if !approx_equal(pattern.data.average_entropy, 8.0, 1) {
-            panic!(
-                "expected = 8.0, actual = {}",
-                utils::round_to_dp(pattern.data.average_entropy, 1)
-            );
-        }
+        assert_eq!(pattern.data.max_entropy, 798);
+        assert_eq!(pattern.data.min_entropy, 798);
     }
     #[test]
     fn test_no_strings_observed() {
@@ -678,8 +683,13 @@ mod tests_pattern {
         let pattern = build_test("strings", "8", true, false, false);
 
         assert_eq!(
-            pattern.data.average_entropy, 0.0,
-            "average entropy were set when no average entropy was specified"
+            pattern.data.max_entropy, 0,
+            "maximum entropy were set when no average entropy was specified"
+        );
+
+        assert_eq!(
+            pattern.data.min_entropy, 0,
+            "minimum entropy were set when no average entropy was specified"
         );
     }
 
@@ -687,14 +697,8 @@ mod tests_pattern {
     fn test_entropy_3() {
         let pattern = build_test("entropy", "3", false, false, true);
 
-        // Floats are tricky, we need a little bit of fuzziness to properly check them.
-        if !approx_equal(pattern.data.average_entropy, 0f32, 1) {
-            panic!("expected = 0, actual = {}", pattern.data.average_entropy);
-        }
-    }
-
-    fn approx_equal(a: f32, b: f32, decimal_places: usize) -> bool {
-        utils::round_to_dp(a, decimal_places) == utils::round_to_dp(b, decimal_places)
+        assert_eq!(pattern.data.max_entropy, 0);
+        assert_eq!(pattern.data.min_entropy, 0)
     }
 
     fn build_test(
