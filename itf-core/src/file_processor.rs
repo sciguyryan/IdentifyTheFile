@@ -6,7 +6,7 @@ use std::{
 };
 
 pub(crate) const ASCII_CHARACTER_STRING: &str =
-    " !#$+,-./0123456789<=>?ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz";
+    " !#$+,-./0123456789<=>?ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz{}~";
 const ASCII_READABLE_CHARACTERS: &[u8] = ASCII_CHARACTER_STRING.as_bytes();
 const ASCII_READABLE_CHARACTERS_SET: [bool; 256] =
     get_ascii_readable_characters_set(ASCII_READABLE_CHARACTERS);
